@@ -8,3 +8,22 @@ static double simple_triangle_wave(void);
 static double simple_pulse_wave(void);
 
 
+Oscillator_State::Oscillator_State() {
+
+}
+
+Oscillator_Configuration::Oscillator_Configuration(){
+
+}
+
+Synth::Synth(){
+
+}
+
+Voice::Voice(){
+
+}
+
+void Synth::run(void){
+    return;
+}

@@ -30,7 +30,7 @@ class Synth {
 public:
     static constexpr size_t voice_count = 4;
     Synth();
-    ~Synth();
+    ~Synth() = default;
 
     void run(void);
 
@@ -42,7 +42,7 @@ class Voice {
 public:
     static constexpr size_t osc_max = 1;
     Voice();
-    ~Voice();
+    ~Voice() = default;
 
 private:
     std::vector<Oscillator_State> oscs;
@@ -51,7 +51,7 @@ private:
 class Oscillator_State {
 public:
     Oscillator_State();
-    ~Oscillator_State();
+    ~Oscillator_State() = default;
     void reset(void);
     double time_increment(double dt);
     double phase_increment(double inc, double max);

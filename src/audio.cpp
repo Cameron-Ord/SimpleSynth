@@ -3,6 +3,7 @@
 #include <iostream>
 
 static constexpr size_t CALLBACK_FRAME_MAX = 128;
+static constexpr float zeroed[CALLBACK_FRAME_MAX]{};
 
 static bool stream_feed(SDL_AudioStream *stream, const float samples[], int len);
 
@@ -14,7 +15,8 @@ void stream_get(void *data, SDL_AudioStream *stream, int add, int total) {
   (void)total;
   size_t sample_count = (uint32_t)add / sizeof(float);
   while (sample_count > 0) {
-    float samples[CALLBACK_FRAME_MAX] = {0};
+    float samples[CALLBACK_FRAME_MAX];
+    memcpy(samples, zeroed, sizeof(float)*CALLBACK_FRAME_MAX);
     const size_t N = SDL_min(sample_count, SDL_arraysize(samples));
     synth->run(/*N, samples*/);
     stream_feed(stream, samples, (int32_t)N * (int32_t)sizeof(float));

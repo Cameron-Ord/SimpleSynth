@@ -9,6 +9,8 @@ set(SRCS
     src/main.cpp
     src/keyboard.cpp
     src/audio.cpp
+    src/synthesizer.cpp
+    src/conversions.cpp
 )
 
 add_subdirectory(third_party/SDL3)

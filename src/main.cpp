@@ -1,6 +1,7 @@
 #include "../inc/keyboard.hpp"
 #include "../inc/util.hpp"
 #include "../inc/audio.hpp"
+#include "../inc/synth.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -30,6 +31,10 @@ int main(int argc, char **argv){
         return 1;
     }
 
+    Synth synth;
+    Audio_Sys audio(CHANNELS, SAMPLE_RATE);
+    audio.open(&synth);
+
     bool looping = true;
     while(looping){
         if(sdl_wait_quit()){
@@ -37,6 +42,7 @@ int main(int argc, char **argv){
         }
     }
     print_charstr("Quiting!");
+    audio.close();
     sdl_deinit();
     return EXIT_SUCCESS;
 }
