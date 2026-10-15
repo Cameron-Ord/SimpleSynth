@@ -7,8 +7,8 @@ static constexpr float zeroed[CALLBACK_FRAME_MAX]{};
 
 static bool stream_feed(SDL_AudioStream *stream, const float samples[], int len);
 
-void stream_get(void *data, SDL_AudioStream *stream, int add, int total) {
-  Synth *synth = static_cast<Synth *>(data);
+void stream_get(void *const user_data, SDL_AudioStream *stream, int add, int total) {
+  Synth *const synth = static_cast<Synth *const>(user_data);
   if (!synth)
     return;
  // Additional is consumed immediately
@@ -46,7 +46,7 @@ void Audio_Sys::list_audio_drivers(int ndrivers){
     }
 }
 
-bool Audio_Sys::open(void *userdata) {
+bool Audio_Sys::open(void *const userdata) {
   if (!(open_audio_device() && create_audio_stream())) {
     return false;
   }
@@ -71,7 +71,7 @@ void Audio_Sys::clear(void) {
   }
 }
 
-bool Audio_Sys::set_audio_callback(void *userdata) {
+bool Audio_Sys::set_audio_callback(void *const userdata) {
   if (!SDL_SetAudioStreamGetCallback(stream, stream_get, userdata)) {
     std::cerr << "Failed to set callback: " << SDL_GetError() << std::endl;
     return false;

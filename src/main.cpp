@@ -25,15 +25,15 @@ int main(int argc, char **argv){
         return EXIT_FAILURE;
     }
     sdl_print_version();
+    const std::unique_ptr<Synth> synth = std::make_unique<Synth>();
 
-    std::unique_ptr<MidiContext> midi_context = create_midi_context();
+    const std::unique_ptr<MidiContext> midi_context = create_midi_context();
     if(!midi_context){
         return 1;
     }
 
-    Synth synth;
     Audio_Sys audio(CHANNELS, SAMPLE_RATE);
-    audio.open(&synth);
+    audio.open(synth.get());
 
     bool looping = true;
     while(looping){

@@ -43,18 +43,21 @@ public:
     static constexpr size_t osc_max = 1;
     Voice();
     ~Voice() = default;
+    bool query_active(void) const { return active; }
 
 private:
     std::vector<Oscillator_State> oscs;
+    bool active = false;
 };
 
 class Oscillator_State {
 public:
+    static constexpr double phase_max = 1.0;
     Oscillator_State();
     ~Oscillator_State() = default;
     void reset(void);
     double time_increment(double dt);
-    double phase_increment(double inc, double max);
+    double phase_increment(double inc);
 
 private:
     double phase = 0.0;

@@ -10,9 +10,9 @@ public:
   ~Audio_Sys(void) = default;
   int get_num_audio_drivers(void);
   void list_audio_drivers(int ndrivers);
-  bool open(void *userdata);
+  bool open(void *const userdata);
   void close(void);
-  bool set_audio_callback(void *userdata);
+  bool set_audio_callback(void *const userdata);
   bool bind_stream(void);
   bool unbind_stream(void);
   bool open_audio_device(void);

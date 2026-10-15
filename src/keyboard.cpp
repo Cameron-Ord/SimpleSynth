@@ -1,12 +1,14 @@
 #include "../inc/keyboard.hpp"
 #include "../inc/util.hpp"
+#include "../inc/synth.hpp"
 
 #include <stdexcept>
 #include <string>
 
 // https://midi.org/summary-of-midi-1-0-messages
 // Need to inject a synth class pointer to this in order to do anything
-void midi_callback(double delta_time, std::vector<unsigned char> *message, void *user_data){
+void midi_callback(double delta_time, std::vector<unsigned char> *message, void *const user_data){
+    Synth *const synth = static_cast<Synth *const>(user_data);
     unsigned int nbytes = message->size();
     for(unsigned int i = 0; i < nbytes; i++){
         std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
@@ -15,7 +17,7 @@ void midi_callback(double delta_time, std::vector<unsigned char> *message, void 
     }
 }
 
-void error_callback(RtMidiError::Type type, const std::string &error_text, void* user_data){
+void error_callback(RtMidiError::Type type, const std::string &error_text, void *const user_data){
     throw std::runtime_error("RtMidi Error: " + error_text);  
 }
 
@@ -36,7 +38,7 @@ void MidiContext::print_version(void) {
     std::cout << "{ RtMidi Version: " << midi_in->getVersion() << " }" << std::endl;
 }
 
-void MidiContext::set_error_callback(void (*error_cb)(RtMidiError::Type type, const std::string &errorText, void *userData)){
+void MidiContext::set_error_callback(void (*error_cb)(RtMidiError::Type type, const std::string &error_text, void *const user_data)){
     midi_in->setErrorCallback(error_cb);
 }
 

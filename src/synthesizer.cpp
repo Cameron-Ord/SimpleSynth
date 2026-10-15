@@ -12,6 +12,19 @@ Oscillator_State::Oscillator_State() {
 
 }
 
+void Oscillator_State::reset(void){
+    phase = 0.0;
+    time = 0.0;
+}
+
+double Oscillator_State::time_increment(double dt){
+    return time + dt;
+}
+
+double Oscillator_State::phase_increment(double inc){
+    return (phase + inc) > Oscillator_State::phase_max ? 1.0 : phase + inc;
+}
+
 Oscillator_Configuration::Oscillator_Configuration(){
 
 }

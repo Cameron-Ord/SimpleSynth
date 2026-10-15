@@ -5,14 +5,14 @@
 #include <memory>
 
 #include <RtMidi.h>
-void midi_callback(double delta_time, std::vector<unsigned char> *message, void *user_data);
+void midi_callback(double delta_time, std::vector<unsigned char> *message, void *const user_data);
 void error_callback(RtMidiError::Type type, const std::string &error_text, void* user_data);
 
 class MidiContext {
 public:
     MidiContext();
     ~MidiContext();
-    void set_error_callback(void (*error_cb)(RtMidiError::Type type, const std::string &errorText, void *userData));
+    void set_error_callback(void (*error_cb)(RtMidiError::Type type, const std::string &errorText, void *const userData));
     void print_version(void);
     void open_dft_port(void);
     void initialize(void);
