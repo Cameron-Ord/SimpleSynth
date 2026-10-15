@@ -1,5 +1,6 @@
 #include "../inc/keyboard.hpp"
 #include "../inc/util.hpp"
+#include "../inc/audio.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -9,20 +10,25 @@
 
 // A compressed sample rate that was used in some hardware GBA games.
 constexpr int SAMPLE_RATE = 13379;
+constexpr int CHANNELS = 2;
 
 static bool sdl_init(void);
 static void sdl_deinit(void);
 static void sdl_print_version(void);
 static bool sdl_wait_quit(void);
 
-static std::unique_ptr<MidiContext> create_midi_context(std::string devname);
+static std::unique_ptr<MidiContext> create_midi_context();
 
 int main(int argc, char **argv){
     if(!sdl_init()){
         return EXIT_FAILURE;
     }
     sdl_print_version();
-    std::unique_ptr<MidiContext> midi_context = create_midi_context("Dummy");
+
+    std::unique_ptr<MidiContext> midi_context = create_midi_context();
+    if(!midi_context){
+        return 1;
+    }
 
     bool looping = true;
     while(looping){
@@ -35,18 +41,17 @@ int main(int argc, char **argv){
     return EXIT_SUCCESS;
 }
 
-static std::unique_ptr<MidiContext> create_midi_context(std::string devname){
+static std::unique_ptr<MidiContext> create_midi_context(){
     try {
-        return std::make_unique<MidiContext>(devname);
+        return std::make_unique<MidiContext>();
     } catch (const std::runtime_error& error) {
         std::cerr << "** " << error.what() << " ** { Caught at create_midi_context() } " << std::endl;
         return nullptr;
     } catch (const std::bad_alloc& error) {
-        std:: cerr << "** Out of memory ** " << std::endl;
+        std:: cerr << "** Out of memory **" << std::endl;
         std::exit(EXIT_FAILURE);
     }
 }
-
 // Headless SDL app can't read keyboard inputs without a focused 
 // rendering context 
 
@@ -57,7 +62,7 @@ static std::unique_ptr<MidiContext> create_midi_context(std::string devname){
 // tweakable parameters or a GUI so I will just be leaving it this way.
 
 // If at any point I wish to create a GUI for this synth and changeable parameters, 
-// it will be a seperate repo.
+// it will be a seperate repo, but It will originate from here.
 static bool sdl_wait_quit(void){
     SDL_Event event;
     SDL_WaitEvent(&event);

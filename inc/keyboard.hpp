@@ -10,7 +10,7 @@ void error_callback(RtMidiError::Type type, const std::string &error_text, void*
 
 class MidiContext {
 public:
-    MidiContext(std::string device_name);
+    MidiContext();
     ~MidiContext();
     void set_error_callback(void (*error_cb)(RtMidiError::Type type, const std::string &errorText, void *userData));
     void print_version(void);

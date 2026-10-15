@@ -5,8 +5,7 @@
 #include <string>
 
 // https://midi.org/summary-of-midi-1-0-messages
-// https://en.wikipedia.org/wiki/MIDI_tuning_standard
-
+// Need to inject a synth class pointer to this in order to do anything
 void midi_callback(double delta_time, std::vector<unsigned char> *message, void *user_data){
     unsigned int nbytes = message->size();
     for(unsigned int i = 0; i < nbytes; i++){
@@ -20,7 +19,7 @@ void error_callback(RtMidiError::Type type, const std::string &error_text, void*
     throw std::runtime_error("RtMidi Error: " + error_text);  
 }
 
-MidiContext::MidiContext(std::string device_name) : midi_in(nullptr) {
+MidiContext::MidiContext() : midi_in(nullptr) {
     initialize();
     print_version();
     set_error_callback(error_callback);
