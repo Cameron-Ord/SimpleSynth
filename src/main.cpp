@@ -8,32 +8,29 @@
 
 #include <SDL3/SDL.h>
 #include <RtMidi.h>
+#include <stdexcept>
 
 // A compressed sample rate that was used in some hardware GBA games.
-constexpr int SAMPLE_RATE = 13379;
-constexpr int CHANNELS = 2;
-
 static bool sdl_init(void);
 static void sdl_deinit(void);
 static void sdl_print_version(void);
 static bool sdl_wait_quit(void);
 
-static std::unique_ptr<MidiContext> create_midi_context();
+static std::unique_ptr<MidiContext> create_midi_context(void);
+static std::unique_ptr<Synth> create_synth_context(void);
+static void open_audio(Audio_Sys& a, void *const userdata);
 
 int main(int argc, char **argv){
     if(!sdl_init()){
         return EXIT_FAILURE;
     }
     sdl_print_version();
-    const std::unique_ptr<Synth> synth = std::make_unique<Synth>();
 
+    const std::unique_ptr<Synth> synth = create_synth_context();
     const std::unique_ptr<MidiContext> midi_context = create_midi_context();
-    if(!midi_context){
-        return 1;
-    }
 
-    Audio_Sys audio(CHANNELS, SAMPLE_RATE);
-    audio.open(synth.get());
+    Audio_Sys audio;
+    open_audio(audio, synth.get());
 
     bool looping = true;
     while(looping){
@@ -42,17 +39,38 @@ int main(int argc, char **argv){
         }
     }
     print_charstr("Quiting!");
-    audio.close();
     sdl_deinit();
     return EXIT_SUCCESS;
 }
 
-static std::unique_ptr<MidiContext> create_midi_context(){
+static void open_audio(Audio_Sys& a, void *const userdata) {
+    try {
+        a.open(userdata);
+    } catch (const std::runtime_error& error) {
+        std::cerr << "** " << error.what() << " ** { Caught at open_audio() } " << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+static std::unique_ptr<Synth> create_synth_context(void){
+    try {
+        return std::make_unique<Synth>();
+    } catch (const std::bad_alloc& error) {
+        std::cerr << "** " << error.what() << " ** { Caught at create_synth_context() } " << std::endl;
+        std::exit(EXIT_FAILURE);
+    // extreme paranoia i guess
+    } catch (const std::exception& error){
+        std::cerr << "** " << error.what() << " ** { Caught at create_synth_context() } " << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+static std::unique_ptr<MidiContext> create_midi_context(void){
     try {
         return std::make_unique<MidiContext>();
     } catch (const std::runtime_error& error) {
         std::cerr << "** " << error.what() << " ** { Caught at create_midi_context() } " << std::endl;
-        return nullptr;
+        std::exit(EXIT_FAILURE);
     } catch (const std::bad_alloc& error) {
         std:: cerr << "** Out of memory **" << std::endl;
         std::exit(EXIT_FAILURE);

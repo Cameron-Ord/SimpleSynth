@@ -6,22 +6,24 @@ void stream_get(void *data, SDL_AudioStream *stream, int add, int total);
 
 class Audio_Sys {
 public:
-  Audio_Sys(int chan, int sample_rate);
+  static constexpr int internal_sample_rate = 13379;
+  static constexpr int internal_channel_count = 2;
+  Audio_Sys(void);
   ~Audio_Sys(void) = default;
   int get_num_audio_drivers(void);
   void list_audio_drivers(int ndrivers);
-  bool open(void *const userdata);
+  void open(void *const userdata);
   void close(void);
-  bool set_audio_callback(void *const userdata);
-  bool bind_stream(void);
-  bool unbind_stream(void);
-  bool open_audio_device(void);
-  bool create_audio_stream(void);
-  bool close_audio_device(void);
-  bool destroy_audio_stream(void);
-  bool resume(void);
-  bool pause(void);
-  void clear(void);
+  void set_audio_callback(void *const userdata);
+  void bind_stream(void);
+  void unbind_stream(void) noexcept;
+  void open_audio_device(void);
+  void create_audio_stream(void);
+  void close_audio_device(void) noexcept;
+  void destroy_audio_stream(void) noexcept;
+  bool resume(void) const noexcept;
+  bool pause(void) const noexcept;
+  void clear(void) noexcept;
 
 private:
   unsigned int dev;
