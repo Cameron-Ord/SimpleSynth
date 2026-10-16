@@ -92,7 +92,9 @@ void Synth::voice_push_note(double freq, double velocity, unsigned int midi_key)
     for(auto it = voices.begin(); it != voices.end(); ++it) {
         Voice& v = *it;
         if(v.get_state() == OFF){
-            v.set_frequency(freq);
+            v.set_target_frequency(freq);
+            v.set_real_frequency(v.get_prev_frequency() != v.dead_freq ? v.get_prev_frequency() : freq);
+            v.set_velocity(velocity);
             for(auto osc_it = v.get_oscs().begin(); osc_it != v.get_oscs().end(); ++osc_it){
                 Oscillator_State& osc = *osc_it;
                 osc.reset();
@@ -111,6 +113,7 @@ void Synth::voice_send_kill_signal(unsigned int midi_key) {
         const bool busy = v.get_state() != OFF && v.get_state() != RELEASING;
         if(busy && v.get_key() == midi_key) {
             v.set_state(RELEASING);
+            v.set_prev_frequency(v.get_target_frequency());
             return;
         }
     }
@@ -122,20 +125,8 @@ void Synth::run(size_t N, float *hardware_buffer){
         double frame_sample = 0.0;
         
         for(auto it = voices.begin(); it != voices.end(); ++it){
-            double voice_sample = 0.0;
-            Voice& v = *it;
-            if(v.get_state() != OFF){
-                v.adsr(dt);
-                std::vector<Oscillator_State>& oscs = v.get_oscs();
-                for(auto osc_it = oscs.begin(); osc_it != oscs.end(); ++osc_it){
-                    Oscillator_State& osc = *osc_it;
-                    const double inc = v.get_frequency() / sample_rate;
-                    osc.set_phase(osc.phase_increment(inc));
-                    voice_sample += simple_saw_wave(osc.get_phase());
-                }
-            frame_sample += v.env_mult(voice_sample);
-            } else {
-                continue;
+            if(it->get_state() != OFF){
+                frame_sample += it->run(dt, *it, sample_rate);
             }
         }
 
@@ -143,3 +134,26 @@ void Synth::run(size_t N, float *hardware_buffer){
         hardware_buffer[n] = compressed;
     }
 }
+
+double Voice::run(double dt, Voice& v, int sample_rate) {
+    double voice_sample = 0.0;
+    v.adsr(dt);
+    std::vector<Oscillator_State>& oscs = v.get_oscs();
+    for(auto osc_it = oscs.begin(); osc_it != oscs.end(); ++osc_it){
+        Oscillator_State& osc = *osc_it;
+        double inc = 0.0;
+
+        const double current = v.get_target_frequency();
+        const double prev = v.get_real_frequency();
+        const double coeff = glide_coefficient(0.125, sample_rate);
+        const double step = v.get_real_frequency() + lerp(current, prev, coeff);
+        v.set_real_frequency(step);
+
+        inc = v.get_real_frequency() / sample_rate;
+        osc.set_phase(osc.phase_increment(inc));
+        voice_sample += simple_saw_wave(osc.get_phase());
+    }
+    return v.env_mult(voice_sample) * v.get_velocity();
+}
+
+

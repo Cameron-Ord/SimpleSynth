@@ -66,25 +66,36 @@ private:
 class Voice {
 public:
     static constexpr size_t osc_count = 1;
+    static constexpr double dead_freq = 0.0;
     Voice(const Oscillator_Configuration& _cfg);
     ~Voice() = default;
 
     unsigned int get_state(void) const { return state; }
     void set_state(unsigned int _state) { state = _state; }
-    void set_frequency(double f) { freq = f; }
+    void set_target_frequency(double f) { target_freq = f; }
+    void set_prev_frequency(double f) { prev_freq = f; }
+    void set_velocity(double v) { velocity = v; }
     void set_key(unsigned int _midi_key) { midi_key = _midi_key; }
     unsigned int get_key(void) const { return midi_key; }
-    double get_frequency(void) const { return freq; }
+    double get_target_frequency(void) const { return target_freq; }
+    double get_prev_frequency(void) const  { return prev_freq; }
+    double get_velocity(void) const { return velocity; }
     double env_mult(double sample);
+    void set_real_frequency(double f) { real_freq = f; }
+    double get_real_frequency(void) const { return real_freq; }
     void adsr(double dt);
     void reset_env(void) { env_value = 0.0; }
+    double run(double dt, Voice& v, int sample_rate);
 
     std::vector<Oscillator_State>& get_oscs(void) { return oscs; }
 
 private:
     std::vector<Oscillator_State> oscs;
     const Oscillator_Configuration& cfg;
-    double freq = 440;
+    double target_freq = dead_freq;
+    double prev_freq = dead_freq;
+    double real_freq = dead_freq;
+    double velocity = 0.0;
     unsigned int midi_key = 0;
     unsigned int state = OFF;
     double env_value = 0.0;

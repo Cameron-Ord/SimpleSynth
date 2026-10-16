@@ -19,3 +19,15 @@ double midi_velocity_to_float(unsigned int velocity){
 double ms_to_ticks(unsigned int ms, int sample_rate) {
     return static_cast<double>(ms) * sample_rate / 1000;
 }
+
+int nyquist_frequency(int sample_rate) {
+    return sample_rate / 2;
+}
+
+double lerp(double current, double prev, double coefficient) {
+    return (current - prev) * coefficient;
+}
+
+double glide_coefficient(double seconds, int sample_rate){
+    return 1.0 / (seconds * sample_rate);
+}
