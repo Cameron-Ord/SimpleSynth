@@ -86,7 +86,7 @@ public:
     double get_real_frequency(void) const { return real_freq; }
     void adsr(double dt);
     void reset_env(void) { env_value = 0.0; }
-    double run(double dt, Voice& v, int sample_rate);
+    double run(double dt, int sample_rate);
 
     std::vector<Oscillator_State>& get_oscs(void) { return oscs; }
 
@@ -97,6 +97,7 @@ private:
     double prev_freq = dead_freq;
     double real_freq = dead_freq;
     double velocity = 0.0;
+    double filter_prev = 0.0;
     unsigned int midi_key = 0;
     unsigned int state = OFF;
     double env_value = 0.0;

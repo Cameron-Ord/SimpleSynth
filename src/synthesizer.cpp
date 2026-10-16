@@ -10,6 +10,17 @@ static double simple_saw_wave(double phase);
 static double simple_square_wave(double phase, double cycle);
 static double simple_triangle_wave(double phase);
 
+//https://en.wikipedia.org/wiki/Low-pass_filter#Simple_infinite_impulse_response_filter
+// RC = 1 / 2*PI*Freq
+// dt = 1 / sample_rate
+// a := dt / (RC + dt)
+static double low_pass_filter(double dt, double cutoff_hz, double current, double prev) {
+    const double RC = 1.0 / (2.0 * PI * cutoff_hz);
+    const double alpha = dt / (RC + dt);
+
+    return prev + lerp(current, prev, alpha);
+}
+
 
 static double simple_sine_wave(double phase) {
     return sin(2.0f * PI * phase);
@@ -123,37 +134,33 @@ void Synth::run(size_t N, float *hardware_buffer){
     const double dt = 1.0 / sample_rate;
     for(int n = 0; n < N; n++){
         double frame_sample = 0.0;
-        
         for(auto it = voices.begin(); it != voices.end(); ++it){
             if(it->get_state() != OFF){
-                frame_sample += it->run(dt, *it, sample_rate);
+                frame_sample += it->run(dt, sample_rate);
+            } else {
+                continue;
             }
         }
-
         float compressed = static_cast<float>(tanh(frame_sample * 0.33));
         hardware_buffer[n] = compressed;
     }
 }
 
-double Voice::run(double dt, Voice& v, int sample_rate) {
+double Voice::run(double dt, int sample_rate) {
     double voice_sample = 0.0;
-    v.adsr(dt);
-    std::vector<Oscillator_State>& oscs = v.get_oscs();
+    adsr(dt);
     for(auto osc_it = oscs.begin(); osc_it != oscs.end(); ++osc_it){
         Oscillator_State& osc = *osc_it;
-        double inc = 0.0;
-
-        const double current = v.get_target_frequency();
-        const double prev = v.get_real_frequency();
-        const double coeff = glide_coefficient(0.033, sample_rate);
-        const double step = v.get_real_frequency() + lerp(current, prev, coeff);
-        v.set_real_frequency(step);
-
-        inc = v.get_real_frequency() / sample_rate;
+        const double coeff = glide_coefficient(0.05, sample_rate);
+        const double step = real_freq + lerp(target_freq, real_freq, coeff);
+        real_freq = step;
+        const double inc = real_freq / sample_rate;
         osc.set_phase(osc.phase_increment(inc));
-        voice_sample += simple_square_wave(osc.get_phase(), cfg.square_duty_cycle);
+        voice_sample += simple_saw_wave(osc.get_phase());
     }
-    return v.env_mult(voice_sample) * v.get_velocity();
+    const double filtered = low_pass_filter(dt, 2000.0, voice_sample, filter_prev);
+    filter_prev = filtered;
+    return env_mult(filtered) * velocity;
 }
 
 
