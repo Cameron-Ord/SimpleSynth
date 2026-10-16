@@ -18,7 +18,7 @@ void stream_get(void *const user_data, SDL_AudioStream *stream, int add, int tot
     float samples[CALLBACK_FRAME_MAX];
     memcpy(samples, zeroed, sizeof(float)*CALLBACK_FRAME_MAX);
     const size_t N = SDL_min(sample_count, SDL_arraysize(samples));
-    synth->run(/*N, samples*/);
+    synth->run(N, samples);
     stream_feed(stream, samples, (int32_t)N * (int32_t)sizeof(float));
     sample_count -= N;
  }
@@ -29,8 +29,8 @@ static bool stream_feed(SDL_AudioStream *stream, const float samples[], int len)
   return SDL_PutAudioStreamData(stream, samples, len);
 }
 
-Audio_Sys::Audio_Sys()
-: dev(0), stream(NULL), internal({SDL_AUDIO_F32, internal_channel_count, internal_sample_rate}), output({SDL_AUDIO_F32, 0, 0}) {
+Audio_Sys::Audio_Sys(int synth_channels, int synth_sample_rate)
+: dev(0), stream(NULL), internal({SDL_AUDIO_F32, synth_channels, synth_sample_rate}), output({SDL_AUDIO_F32, 0, 0}) {
 }
 
 int Audio_Sys::get_num_audio_drivers(void){
@@ -92,9 +92,9 @@ void Audio_Sys::open_audio_device(void) {
   SDL_GetAudioDeviceFormat(dev, &output, NULL);
   const char *name = SDL_GetAudioDeviceName(dev);
   if(name){
-    std::cout << "Device name: " << name << std::endl;
-    std::cout << "Channels: " << output.channels << " Samplerate: " << output.freq
-              << std::endl;
+    std::cout << "Output Device Name: " << name << std::endl 
+    << "Output Device Channels: " << output.channels << std::endl 
+    << "Output Device Sample Rate: " << output.freq << std::endl;
   }
 }
 

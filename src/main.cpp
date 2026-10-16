@@ -2,6 +2,7 @@
 #include "../inc/util.hpp"
 #include "../inc/audio.hpp"
 #include "../inc/synth.hpp"
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -10,13 +11,15 @@
 #include <RtMidi.h>
 #include <stdexcept>
 
+
+
 // A compressed sample rate that was used in some hardware GBA games.
 static bool sdl_init(void);
 static void sdl_deinit(void);
 static void sdl_print_version(void);
 static bool sdl_wait_quit(void);
 
-static std::unique_ptr<MidiContext> create_midi_context(void);
+static std::unique_ptr<MidiContext> create_midi_context(void *const error_userdata, void *const synth_userdata);
 static std::unique_ptr<Synth> create_synth_context(void);
 static void open_audio(Audio_Sys& a, void *const userdata);
 
@@ -27,9 +30,9 @@ int main(int argc, char **argv){
     sdl_print_version();
 
     const std::unique_ptr<Synth> synth = create_synth_context();
-    const std::unique_ptr<MidiContext> midi_context = create_midi_context();
+    const std::unique_ptr<MidiContext> midi_context = create_midi_context(nullptr, synth.get());
 
-    Audio_Sys audio;
+    Audio_Sys audio(synth->get_channels(), synth->get_sample_rate());
     open_audio(audio, synth.get());
 
     bool looping = true;
@@ -38,7 +41,9 @@ int main(int argc, char **argv){
             looping = false;
         }
     }
+
     print_charstr("Quiting!");
+    audio.close();
     sdl_deinit();
     return EXIT_SUCCESS;
 }
@@ -65,9 +70,9 @@ static std::unique_ptr<Synth> create_synth_context(void){
     }
 }
 
-static std::unique_ptr<MidiContext> create_midi_context(void){
+static std::unique_ptr<MidiContext> create_midi_context(void *const error_userdata, void *const synth_userdata){
     try {
-        return std::make_unique<MidiContext>();
+        return std::make_unique<MidiContext>(error_userdata, synth_userdata);
     } catch (const std::runtime_error& error) {
         std::cerr << "** " << error.what() << " ** { Caught at create_midi_context() } " << std::endl;
         std::exit(EXIT_FAILURE);

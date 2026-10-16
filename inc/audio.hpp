@@ -6,9 +6,7 @@ void stream_get(void *data, SDL_AudioStream *stream, int add, int total);
 
 class Audio_Sys {
 public:
-  static constexpr int internal_sample_rate = 13379;
-  static constexpr int internal_channel_count = 2;
-  Audio_Sys(void);
+  Audio_Sys(int synth_channels, int synth_sample_rate);
   ~Audio_Sys(void) = default;
   int get_num_audio_drivers(void);
   void list_audio_drivers(int ndrivers);
