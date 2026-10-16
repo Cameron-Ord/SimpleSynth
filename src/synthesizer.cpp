@@ -7,7 +7,7 @@ static constexpr double PI = 3.1415926535897932384626433832795;
 static double simple_sine_wave(double phase);
 // These functions will have aliasing
 static double simple_saw_wave(double phase);
-static double simple_square_wave(double phase);
+static double simple_square_wave(double phase, double cycle);
 static double simple_triangle_wave(double phase);
 
 
@@ -19,8 +19,8 @@ static double simple_saw_wave(double phase) {
     return 2.0 * (phase - floor(1.0 / 2.0 + phase));
 }
 
-static double simple_square_wave(double phase) {
-    return phase < 0.5 ? 1.0 : -1.0;
+static double simple_square_wave(double phase, double cycle) {
+    return phase < cycle ? 1.0 : -1.0;
 }
 
 static double simple_triangle_wave(double phase) {
@@ -145,13 +145,13 @@ double Voice::run(double dt, Voice& v, int sample_rate) {
 
         const double current = v.get_target_frequency();
         const double prev = v.get_real_frequency();
-        const double coeff = glide_coefficient(0.125, sample_rate);
+        const double coeff = glide_coefficient(0.033, sample_rate);
         const double step = v.get_real_frequency() + lerp(current, prev, coeff);
         v.set_real_frequency(step);
 
         inc = v.get_real_frequency() / sample_rate;
         osc.set_phase(osc.phase_increment(inc));
-        voice_sample += simple_saw_wave(osc.get_phase());
+        voice_sample += simple_square_wave(osc.get_phase(), cfg.square_duty_cycle);
     }
     return v.env_mult(voice_sample) * v.get_velocity();
 }

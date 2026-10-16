@@ -27,9 +27,10 @@ class Synth;
 class Oscillator_Configuration {
 public:
     static constexpr unsigned int ATK = 10;
-    static constexpr unsigned int DEC = 300;
-    static constexpr unsigned int REL = 200;
+    static constexpr unsigned int DEC = 50;
+    static constexpr unsigned int REL = 50;
     static constexpr double SUS = 0.8;
+    static constexpr double square_duty_cycle = 0.4;
 
     Oscillator_Configuration(int sample_rate);
     ~Oscillator_Configuration() = default;
@@ -104,7 +105,7 @@ private:
 class Synth {
 public:
     static constexpr size_t voice_count = 8;
-    static constexpr int sample_rate = 13379;
+    static constexpr int sample_rate = 48000;
     static constexpr int channels = 1;
     Synth();
     ~Synth() = default;
