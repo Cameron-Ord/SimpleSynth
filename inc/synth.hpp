@@ -26,10 +26,10 @@ class Synth;
 
 class Oscillator_Configuration {
 public:
-    static constexpr unsigned int ATK = 25;
-    static constexpr unsigned int DEC = 375;
-    static constexpr unsigned int REL = 275;
-    static constexpr double SUS = 0.6666;
+    static constexpr unsigned int ATK = 10;
+    static constexpr unsigned int DEC = 300;
+    static constexpr unsigned int REL = 200;
+    static constexpr double SUS = 0.8;
 
     Oscillator_Configuration(int sample_rate);
     ~Oscillator_Configuration() = default;
