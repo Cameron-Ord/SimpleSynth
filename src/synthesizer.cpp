@@ -10,6 +10,27 @@ static double simple_saw_wave(double phase);
 static double simple_square_wave(double phase, double cycle);
 static double simple_triangle_wave(double phase);
 
+static double synth_tree(size_t type, double phase, double pulse_cycle) {
+    switch(type) {
+        default: return 0.0;
+        case SINE : {
+            return simple_sine_wave(phase);
+        }break;
+        case SAW : {
+            return simple_saw_wave(phase);
+        }break;
+        case SQUARE : {
+            return simple_square_wave(phase, 0.5);
+        }break;
+        case TRIANGLE : {
+            return simple_triangle_wave(phase);
+        }break;
+        case PULSE: {
+            return simple_square_wave(phase, pulse_cycle);
+        }break;
+    }
+}
+
 constexpr double neutral = 1.0;
 constexpr double falloff = 0.01;
 
@@ -80,15 +101,23 @@ double Lfo::increment(int sample_rate){
     return (phase + (rate / sample_rate)) >= phase_max ? 0.0 : phase + (rate / sample_rate);
 }
 
-Synth::Synth() : osc_config(sample_rate), voices(voice_count, Voice(osc_config)) {}
+Synth::Synth() : osc_config(sample_rate, { PULSE }), voices(voice_count, Voice(osc_config)) {}
 
-Voice::Voice(const Oscillator_Configuration& _cfg) : oscs(osc_count, Oscillator_State()), cfg(_cfg) {}
+Voice::Voice(const Oscillator_Configuration& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
 
-Oscillator_Configuration::Oscillator_Configuration(int sample_rate){
+Oscillator_Configuration::Oscillator_Configuration(int sample_rate, std::vector<size_t> _types) : types(_types) {
     attack_rate = 1.0 / ms_to_ticks(ATK, sample_rate);
     decay_rate = 1.0 / ms_to_ticks(DEC, sample_rate);
     release_rate = 1.0 / ms_to_ticks(REL, sample_rate);
 }
+
+size_t Oscillator_Configuration::get_type_at(size_t i) const {
+    if(i < types.size()){
+        return types[i];
+    }
+    return SAW;
+}
+
 
 void Oscillator_State::reset(void){
     phase = 0.0;
@@ -183,7 +212,7 @@ void Synth::run(size_t N, float *samples){
                 continue;
             }
         }
-        samples[n] = frame_sample;
+        samples[n] = static_cast<float>(frame_sample);
     }
     compressor(N, samples);
 }
@@ -191,17 +220,16 @@ void Synth::run(size_t N, float *samples){
 double Voice::run(double dt, int sample_rate) {
     double voice_sample = 0.0;
     adsr(dt);
-    const double coeff = glide_coefficient(0.01, sample_rate);
+    const double coeff = glide_coefficient(0.1, sample_rate);
     real_freq = real_freq + lerp(target_freq, real_freq, coeff);
-    for(auto osc_it = oscs.begin(); osc_it != oscs.end(); ++osc_it){
-        Oscillator_State& osc = *osc_it;
+    for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
+        Oscillator_State& osc = oscs[i];
         const double inc = real_freq / sample_rate;
         osc.set_phase(osc.phase_increment(inc));
-        voice_sample += simple_saw_wave(osc.get_phase());
+        voice_sample += synth_tree(cfg.get_type_at(i), osc.get_phase(), cfg.pulse_duty_cycle);
     }
-    const double filtered = low_pass_filter(dt, 4000.0, voice_sample, filter_prev);
-    filter_prev = filtered;
-    return env_mult(filtered) * velocity;
+    filter_prev = low_pass_filter(dt, 2000.0, voice_sample, filter_prev);
+    return env_mult(filter_prev) * velocity;
 }
 
 

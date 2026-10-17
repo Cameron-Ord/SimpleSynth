@@ -28,8 +28,8 @@ class Lfo;
 class Lfo {
 public:
     static constexpr double phase_max = 1.0;
-    static constexpr double rate = 9.0;
-    static constexpr double depth = 6.0;
+    static constexpr double rate = 2.0;
+    static constexpr double depth = 4.0;
     Lfo() = default;
     ~Lfo() = default;
     double sinusoid(void);
@@ -46,17 +46,19 @@ public:
     static constexpr unsigned int DEC = 125;
     static constexpr unsigned int REL = 150;
     static constexpr double SUS = 0.7;
-    static constexpr double square_duty_cycle = 0.5;
+    static constexpr double pulse_duty_cycle = 0.125;
 
-    Oscillator_Configuration(int sample_rate);
+    Oscillator_Configuration(int sample_rate, std::vector<size_t> _types);
     ~Oscillator_Configuration() = default;
 
+    size_t get_osc_count(void) const { return types.size(); }
+    size_t get_type_at(size_t i) const;
     double get_attack_rate(void) const { return attack_rate; }
     double get_decay_rate(void) const { return decay_rate; }
     double get_release_rate(void) const { return release_rate; }
 
 private:
-    size_t oscillator_type = SINE;
+    std::vector<size_t> types;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
@@ -86,7 +88,6 @@ private:
 
 class Voice {
 public:
-    static constexpr size_t osc_count = 2;
     static constexpr double dead_freq = 0.0;
     Voice(const Oscillator_Configuration& _cfg);
     ~Voice() = default;
@@ -111,8 +112,8 @@ public:
     std::vector<Oscillator_State>& get_oscs(void) { return oscs; }
 
 private:
-    std::vector<Oscillator_State> oscs;
     const Oscillator_Configuration& cfg;
+    std::vector<Oscillator_State> oscs;
     double target_freq = dead_freq;
     double prev_freq = dead_freq;
     double real_freq = dead_freq;
@@ -126,7 +127,7 @@ private:
 class Synth {
 public:
     static constexpr size_t voice_count = 8;
-    static constexpr int sample_rate = 13379;
+    static constexpr int sample_rate = 44100;
     static constexpr int channels = 1;
     Synth();
     ~Synth() = default;
