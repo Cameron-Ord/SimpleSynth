@@ -23,14 +23,30 @@ class Voice;
 class Oscillator_State;
 class Oscillator_Configuration;
 class Synth;
+class Lfo;
+
+class Lfo {
+public:
+    static constexpr double phase_max = 1.0;
+    static constexpr double rate = 9.0;
+    static constexpr double depth = 6.0;
+    Lfo() = default;
+    ~Lfo() = default;
+    double sinusoid(void);
+    double increment(int sample_rate);
+    void set_phase(double p) { phase = p; }
+    double get_phase(void) { return phase; }
+private:
+    double phase = 0.0;
+};
 
 class Oscillator_Configuration {
 public:
-    static constexpr unsigned int ATK = 10;
-    static constexpr unsigned int DEC = 50;
-    static constexpr unsigned int REL = 50;
-    static constexpr double SUS = 0.8;
-    static constexpr double square_duty_cycle = 0.4;
+    static constexpr unsigned int ATK = 25;
+    static constexpr unsigned int DEC = 125;
+    static constexpr unsigned int REL = 150;
+    static constexpr double SUS = 0.7;
+    static constexpr double square_duty_cycle = 0.5;
 
     Oscillator_Configuration(int sample_rate);
     ~Oscillator_Configuration() = default;
@@ -58,15 +74,19 @@ public:
     double phase_increment(double inc);
     double get_phase(void) const { return phase; }
     double get_time(void) const { return time; }
+    Lfo& get_lfo1(void) { return lfo1; }
 
 private:
     double phase = 0.0;
     double time = 0.0;
+    Lfo lfo1;
+    Lfo lfo2;
+    Lfo lfo3;
 };
 
 class Voice {
 public:
-    static constexpr size_t osc_count = 1;
+    static constexpr size_t osc_count = 2;
     static constexpr double dead_freq = 0.0;
     Voice(const Oscillator_Configuration& _cfg);
     ~Voice() = default;
@@ -106,7 +126,7 @@ private:
 class Synth {
 public:
     static constexpr size_t voice_count = 8;
-    static constexpr int sample_rate = 48000;
+    static constexpr int sample_rate = 13379;
     static constexpr int channels = 1;
     Synth();
     ~Synth() = default;

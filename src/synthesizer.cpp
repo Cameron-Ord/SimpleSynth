@@ -10,6 +10,41 @@ static double simple_saw_wave(double phase);
 static double simple_square_wave(double phase, double cycle);
 static double simple_triangle_wave(double phase);
 
+constexpr double neutral = 1.0;
+constexpr double falloff = 0.01;
+
+//https://github.com/mmitch/syndig/blob/master/src/compressor.c
+static void compressor(size_t N, float *buffer){
+    static bool compressing = false;
+    static double compression = neutral;
+    double min = 0.0;
+    double max = 0.0;
+    for(size_t n = 0; n < N; n++){
+        if(buffer[n] < min) {
+            min = buffer[n];
+        } else if (buffer[n] > max){
+            max = buffer[n];
+        }
+    }
+    max = std::max(max, -min);
+    if(max > compression){
+        compression = max;
+        if(!compressing){
+            compressing = true;
+        }
+    } else if(compression > neutral) {
+        compression = std::max(compression - falloff, neutral);
+        if(compression == neutral){
+            compressing = false;
+        }
+    }
+    if(compressing){
+        for(size_t n = 0; n < N; n++){
+            buffer[n] /= compression;
+        }
+    }
+}
+
 //https://en.wikipedia.org/wiki/Low-pass_filter#Simple_infinite_impulse_response_filter
 // RC = 1 / 2*PI*Freq
 // dt = 1 / sample_rate
@@ -20,7 +55,6 @@ static double low_pass_filter(double dt, double cutoff_hz, double current, doubl
 
     return prev + lerp(current, prev, alpha);
 }
-
 
 static double simple_sine_wave(double phase) {
     return sin(2.0f * PI * phase);
@@ -36,6 +70,14 @@ static double simple_square_wave(double phase, double cycle) {
 
 static double simple_triangle_wave(double phase) {
     return 2.0 * fabs(2.0 * phase - floor(phase + (1.0 / 2.0))) - 1.0;
+}
+
+double Lfo::sinusoid(){
+    return sin(2.0f * PI * phase) * depth;
+}
+
+double Lfo::increment(int sample_rate){
+    return (phase + (rate / sample_rate)) >= phase_max ? 0.0 : phase + (rate / sample_rate);
 }
 
 Synth::Synth() : osc_config(sample_rate), voices(voice_count, Voice(osc_config)) {}
@@ -58,7 +100,7 @@ double Oscillator_State::time_increment(double dt){
 }
 
 double Oscillator_State::phase_increment(double inc){
-    return (phase + inc) > Oscillator_State::phase_max ? 0.0 : phase + inc;
+    return (phase + inc) >= phase_max ? 0.0 : phase + inc;
 }
 
 // https://github.com/mmitch/syndig/blob/master/src/envelope.c#L144
@@ -130,7 +172,7 @@ void Synth::voice_send_kill_signal(unsigned int midi_key) {
     }
 }
 
-void Synth::run(size_t N, float *hardware_buffer){
+void Synth::run(size_t N, float *samples){
     const double dt = 1.0 / sample_rate;
     for(int n = 0; n < N; n++){
         double frame_sample = 0.0;
@@ -141,24 +183,23 @@ void Synth::run(size_t N, float *hardware_buffer){
                 continue;
             }
         }
-        float compressed = static_cast<float>(tanh(frame_sample * 0.33));
-        hardware_buffer[n] = compressed;
+        samples[n] = frame_sample;
     }
+    compressor(N, samples);
 }
 
 double Voice::run(double dt, int sample_rate) {
     double voice_sample = 0.0;
     adsr(dt);
+    const double coeff = glide_coefficient(0.01, sample_rate);
+    real_freq = real_freq + lerp(target_freq, real_freq, coeff);
     for(auto osc_it = oscs.begin(); osc_it != oscs.end(); ++osc_it){
         Oscillator_State& osc = *osc_it;
-        const double coeff = glide_coefficient(0.05, sample_rate);
-        const double step = real_freq + lerp(target_freq, real_freq, coeff);
-        real_freq = step;
         const double inc = real_freq / sample_rate;
         osc.set_phase(osc.phase_increment(inc));
         voice_sample += simple_saw_wave(osc.get_phase());
     }
-    const double filtered = low_pass_filter(dt, 2000.0, voice_sample, filter_prev);
+    const double filtered = low_pass_filter(dt, 4000.0, voice_sample, filter_prev);
     filter_prev = filtered;
     return env_mult(filtered) * velocity;
 }
