@@ -122,7 +122,7 @@ double Lfo::increment(int sample_rate){
     return (phase + (rate / sample_rate)) >= phase_max ? 0.0 : phase + (rate / sample_rate);
 }
 
-Synth::Synth() : osc_config(sample_rate, { SAW }), voices(voice_count, Voice(osc_config)) {}
+Synth::Synth() : osc_config(sample_rate, { SAW, SQUARE }), voices(voice_count, Voice(osc_config)) {}
 
 Voice::Voice(const Oscillator_Configuration& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
 
