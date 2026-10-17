@@ -4,29 +4,50 @@
 #include <iostream>
 static constexpr double PI = 3.1415926535897932384626433832795;
 
-static double simple_sine_wave(double phase);
+static double naive_sine_wave(double phase);
 // These functions will have aliasing
-static double simple_saw_wave(double phase);
-static double simple_square_wave(double phase, double cycle);
-static double simple_triangle_wave(double phase);
+static double naive_saw_wave(double phase);
+static double naive_square_wave(double phase, double cycle);
+static double naive_triangle_wave(double phase);
 
-static double synth_tree(size_t type, double phase, double pulse_cycle) {
+static double poly_blep(double t, double dt);
+static void compressor(size_t N, float *buffer);
+static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle);
+
+//https://www.martin-finke.de/articles/audio-plugins-018-polyblep-oscillator/
+//https://www.metafunction.co.uk/post/all-about-digital-oscillators-part-2-blits-bleps
+static double poly_blep(double t, double dt) {
+    if(t < dt) {
+        t /= dt;
+        return t+t - t*t - 1.0;
+    } else if (t > 1.0 - dt){
+        t = (t - 1.0) / dt;
+        return t*t + t+t + 1.0;
+    } else {
+        return 0.0;
+    }
+} 
+
+static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle) {
+    // Don't need to normalize by 2.0 * PI since things are already 0..1
+    const double t = phase;
+    const double dt = phase_inc;
     switch(type) {
         default: return 0.0;
         case SINE : {
-            return simple_sine_wave(phase);
+            return naive_sine_wave(phase);
         }break;
         case SAW : {
-            return simple_saw_wave(phase);
+            return naive_saw_wave(phase) - poly_blep(t, dt);
         }break;
         case SQUARE : {
-            return simple_square_wave(phase, 0.5);
+            return naive_square_wave(phase, 0.5) + poly_blep(t, dt) - poly_blep(fmod(t + 0.5, 1.0), dt);
         }break;
         case TRIANGLE : {
-            return simple_triangle_wave(phase);
+            return naive_triangle_wave(phase);
         }break;
         case PULSE: {
-            return simple_square_wave(phase, pulse_cycle);
+            return naive_square_wave(phase, pulse_cycle) + poly_blep(t, dt) - poly_blep(fmod(t + (1.0 - pulse_cycle), 1.0), dt);
         }break;
     }
 }
@@ -77,19 +98,19 @@ static double low_pass_filter(double dt, double cutoff_hz, double current, doubl
     return prev + lerp(current, prev, alpha);
 }
 
-static double simple_sine_wave(double phase) {
+static double naive_sine_wave(double phase) {
     return sin(2.0f * PI * phase);
 }
 
-static double simple_saw_wave(double phase) {
+static double naive_saw_wave(double phase) {
     return 2.0 * (phase - floor(1.0 / 2.0 + phase));
 }
 
-static double simple_square_wave(double phase, double cycle) {
+static double naive_square_wave(double phase, double cycle) {
     return phase < cycle ? 1.0 : -1.0;
 }
 
-static double simple_triangle_wave(double phase) {
+static double naive_triangle_wave(double phase) {
     return 2.0 * fabs(2.0 * phase - floor(phase + (1.0 / 2.0))) - 1.0;
 }
 
@@ -101,7 +122,7 @@ double Lfo::increment(int sample_rate){
     return (phase + (rate / sample_rate)) >= phase_max ? 0.0 : phase + (rate / sample_rate);
 }
 
-Synth::Synth() : osc_config(sample_rate, { PULSE }), voices(voice_count, Voice(osc_config)) {}
+Synth::Synth() : osc_config(sample_rate, { SAW }), voices(voice_count, Voice(osc_config)) {}
 
 Voice::Voice(const Oscillator_Configuration& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
 
@@ -226,7 +247,7 @@ double Voice::run(double dt, int sample_rate) {
         Oscillator_State& osc = oscs[i];
         const double inc = real_freq / sample_rate;
         osc.set_phase(osc.phase_increment(inc));
-        voice_sample += synth_tree(cfg.get_type_at(i), osc.get_phase(), cfg.pulse_duty_cycle);
+        voice_sample += synth_tree(cfg.get_type_at(i), osc.get_phase(), inc, cfg.pulse_duty_cycle);
     }
     filter_prev = low_pass_filter(dt, 2000.0, voice_sample, filter_prev);
     return env_mult(filter_prev) * velocity;
