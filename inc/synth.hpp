@@ -28,12 +28,13 @@ class Lfo;
 class Lfo {
 public:
     static constexpr double phase_max = 1.0;
-    static constexpr double rate = 2.0;
+    static constexpr double rate = 6.0;
     static constexpr double depth = 4.0;
     Lfo() = default;
     ~Lfo() = default;
     double sinusoid(void);
-    double increment(int sample_rate);
+    double get_inc(int sample_rate);
+    double increment(double inc);
     void set_phase(double p) { phase = p; }
     double get_phase(void) { return phase; }
 private:
@@ -77,6 +78,7 @@ public:
     double get_phase(void) const { return phase; }
     double get_time(void) const { return time; }
     Lfo& get_lfo1(void) { return lfo1; }
+    double run(const Oscillator_Configuration& cfg, size_t i, double freq, double sample_rate);
 
 private:
     double phase = 0.0;

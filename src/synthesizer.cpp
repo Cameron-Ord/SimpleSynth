@@ -118,11 +118,15 @@ double Lfo::sinusoid(){
     return sin(2.0f * PI * phase) * depth;
 }
 
-double Lfo::increment(int sample_rate){
-    return (phase + (rate / sample_rate)) >= phase_max ? 0.0 : phase + (rate / sample_rate);
+double Lfo::increment(double inc){
+    return (phase + inc) >= phase_max ? 0.0 : phase + inc;
 }
 
-Synth::Synth() : osc_config(sample_rate, { SAW, SQUARE }), voices(voice_count, Voice(osc_config)) {}
+double Lfo::get_inc(int sample_rate) {
+    return rate / sample_rate;
+}
+
+Synth::Synth() : osc_config(sample_rate, { SAW }), voices(voice_count, Voice(osc_config)) {}
 
 Voice::Voice(const Oscillator_Configuration& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
 
@@ -241,16 +245,23 @@ void Synth::run(size_t N, float *samples){
 double Voice::run(double dt, int sample_rate) {
     double voice_sample = 0.0;
     adsr(dt);
-    const double coeff = glide_coefficient(0.1, sample_rate);
+    const double coeff = glide_coefficient(0.025, sample_rate);
     real_freq = real_freq + lerp(target_freq, real_freq, coeff);
     for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
-        Oscillator_State& osc = oscs[i];
-        const double inc = real_freq / sample_rate;
-        osc.set_phase(osc.phase_increment(inc));
-        voice_sample += synth_tree(cfg.get_type_at(i), osc.get_phase(), inc, cfg.pulse_duty_cycle);
+        voice_sample += oscs[i].run(cfg, i, real_freq, sample_rate);
     }
     filter_prev = low_pass_filter(dt, 2000.0, voice_sample, filter_prev);
     return env_mult(filter_prev) * velocity;
 }
 
+double Oscillator_State::run(const Oscillator_Configuration& cfg, size_t i, double freq, double sample_rate) {
+    const double lfo1_value = lfo1.sinusoid();
+    const double lfo1_inc = lfo1.get_inc(sample_rate);
+    lfo1.set_phase(lfo1.increment(lfo1_inc));
+
+    const double modulated = freq + lfo1_value;
+    const double phase_inc = modulated / sample_rate;
+    set_phase(phase_increment(phase_inc));
+    return synth_tree(cfg.get_type_at(i), get_phase(), phase_inc, cfg.pulse_duty_cycle);
+}
 
