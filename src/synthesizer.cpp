@@ -245,13 +245,16 @@ void Synth::run(size_t N, float *samples){
 double Voice::run(double dt, int sample_rate) {
     double voice_sample = 0.0;
     adsr(dt);
-    const double coeff = glide_coefficient(0.025, sample_rate);
+    const double coeff = glide_coefficient(0.01, sample_rate);
     real_freq = real_freq + lerp(target_freq, real_freq, coeff);
     for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
         voice_sample += oscs[i].run(cfg, i, real_freq, sample_rate);
     }
-    filter_prev = low_pass_filter(dt, 2000.0, voice_sample, filter_prev);
-    return env_mult(filter_prev) * velocity;
+
+    filter[FILTER_PRE] = low_pass_filter(dt, 8000.0, voice_sample, filter[FILTER_PRE]);
+    const double distorted = tanh(filter[FILTER_PRE] * cfg.GAIN);
+    filter[FILTER_POST] = low_pass_filter(dt, 2500.0, distorted, filter[FILTER_POST]);
+    return env_mult(filter[FILTER_POST]) * velocity;
 }
 
 double Oscillator_State::run(const Oscillator_Configuration& cfg, size_t i, double freq, double sample_rate) {
