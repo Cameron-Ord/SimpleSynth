@@ -20,14 +20,22 @@ double ms_to_ticks(unsigned int ms, int sample_rate) {
     return static_cast<double>(ms) * sample_rate / 1000;
 }
 
+double ms_to_seconds(unsigned int ms) { 
+    return ms / 1000.0;
+}
+
+unsigned int seconds_to_ms(double s){
+    return s * 1000.0;
+}
+
 int nyquist_frequency(int sample_rate) {
     return sample_rate / 2;
 }
 
-double lerp(double current, double prev, double coefficient) {
-    return (current - prev) * coefficient;
+double step(double current, double prev, double coefficient) {
+    return prev + (current - prev) * coefficient;
 }
 
-double glide_coefficient(double seconds, int sample_rate){
-    return 1.0 / (seconds * sample_rate);
+double clamp_exponential(double EPS, double target, double actual){
+    return std::abs(target - actual) <= EPS ? target : actual;   
 }

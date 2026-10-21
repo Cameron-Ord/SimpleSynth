@@ -34,8 +34,6 @@ class Lfo;
 class Lfo {
 public:
     static constexpr double phase_max = 1.0;
-    static constexpr double rate = 6.0;
-    static constexpr double depth = 3.0;
     Lfo() = default;
     ~Lfo() = default;
     double sinusoid(void);
@@ -45,17 +43,12 @@ public:
     double get_phase(void) { return phase; }
 private:
     double phase = 0.0;
+    double rate = 6.0;
+    double depth = 3.0;
 };
 
 class Oscillator_Configuration {
 public:
-    static constexpr unsigned int ATK = 100;
-    static constexpr unsigned int DEC = 250;
-    static constexpr unsigned int REL = 500;
-    static constexpr double SUS = 0.7;
-    static constexpr double pulse_duty_cycle = 0.125;
-    static constexpr double GAIN = 1.5;
-
     Oscillator_Configuration(int sample_rate, std::vector<size_t> _types);
     ~Oscillator_Configuration() = default;
 
@@ -65,11 +58,24 @@ public:
     double get_decay_rate(void) const { return decay_rate; }
     double get_release_rate(void) const { return release_rate; }
 
+    double get_gain(void) const { return GAIN; }
+    double get_sustain(void) const { return SUS; }
+    double get_attack(void) const { return ATK; }
+    double get_decay(void) const { return DEC; }
+    double get_release(void) const { return REL; }
+    double get_cycle(void) const { return CYCLE; }
+
 private:
     std::vector<size_t> types;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
+    unsigned int ATK = 100;
+    unsigned int DEC = 250;
+    unsigned int REL = 500;
+    double SUS = 0.7;
+    double GAIN = 1.5;
+    double CYCLE = 0.25;
 };
 
 class Oscillator_State {
@@ -123,13 +129,14 @@ public:
 private:
     const Oscillator_Configuration& cfg;
     std::vector<Oscillator_State> oscs;
+    std::array<double, INDEXES_SIZE> filter{};
     double target_freq = dead_freq;
     double prev_freq = dead_freq;
     double real_freq = dead_freq;
     double velocity = 0.0;
-    std::array<double, INDEXES_SIZE> filter{};
     unsigned int midi_key = 0;
     unsigned int state = OFF;
+    unsigned int portamento_time_ms = 200;
     double env_value = 0.0;
 };
 

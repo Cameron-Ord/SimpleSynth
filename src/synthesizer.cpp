@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 static constexpr double PI = 3.1415926535897932384626433832795;
+static constexpr double EPS = 0.01;
 
 static double naive_sine_wave(double phase);
 // These functions will have aliasing
@@ -95,7 +96,7 @@ static double low_pass_filter(double dt, double cutoff_hz, double current, doubl
     const double RC = 1.0 / (2.0 * PI * cutoff_hz);
     const double alpha = dt / (RC + dt);
 
-    return prev + lerp(current, prev, alpha);
+    return step(current, prev, alpha);
 }
 
 static double naive_sine_wave(double phase) {
@@ -157,6 +158,7 @@ double Oscillator_State::phase_increment(double inc){
     return (phase + inc) >= phase_max ? 0.0 : phase + inc;
 }
 
+
 // https://github.com/mmitch/syndig/blob/master/src/envelope.c#L144
 // Used their method for a simple linear adsr configuration
 double Voice::env_mult(double sample) {
@@ -176,11 +178,11 @@ void Voice::adsr(double dt){
         }break;
 
         case DECAYING:{
-            if(env_value <= cfg.SUS){
-                env_value = cfg.SUS;
+            if(env_value <= cfg.get_sustain()){
+                env_value = cfg.get_sustain();
                 state = SUSTAINING;
             } else {
-                env_value = std::max(env_value - cfg.get_decay_rate(), cfg.SUS);
+                env_value = std::max(env_value - cfg.get_decay_rate(), cfg.get_sustain());
             }
         }break;
 
@@ -243,28 +245,25 @@ void Synth::run(size_t N, float *samples){
 }
 
 double Voice::run(double dt, int sample_rate) {
-    double voice_sample = 0.0;
     adsr(dt);
-    const double coeff = glide_coefficient(0.01, sample_rate);
-    real_freq = real_freq + lerp(target_freq, real_freq, coeff);
+
+    double voice_sample = 0.0;
+    const double GAIN = cfg.get_gain();
+    const double coeff = 1.0 / ms_to_ticks(50, sample_rate);
+    real_freq = clamp_exponential(EPS, target_freq, step(target_freq, real_freq, coeff));
     for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
         voice_sample += oscs[i].run(cfg, i, real_freq, sample_rate);
     }
 
     filter[FILTER_PRE] = low_pass_filter(dt, 8000.0, voice_sample, filter[FILTER_PRE]);
-    const double distorted = tanh(filter[FILTER_PRE] * cfg.GAIN);
-    filter[FILTER_POST] = low_pass_filter(dt, 2500.0, distorted, filter[FILTER_POST]);
+    const double distorted = tanh(filter[FILTER_PRE] * GAIN);
+    filter[FILTER_POST] = low_pass_filter(dt, 4000.0, distorted, filter[FILTER_POST]);
     return env_mult(filter[FILTER_POST]) * velocity;
 }
 
 double Oscillator_State::run(const Oscillator_Configuration& cfg, size_t i, double freq, double sample_rate) {
-    const double lfo1_value = lfo1.sinusoid();
-    const double lfo1_inc = lfo1.get_inc(sample_rate);
-    lfo1.set_phase(lfo1.increment(lfo1_inc));
-
-    const double modulated = freq + lfo1_value;
-    const double phase_inc = modulated / sample_rate;
+    const double phase_inc = freq / sample_rate;
     set_phase(phase_increment(phase_inc));
-    return synth_tree(cfg.get_type_at(i), get_phase(), phase_inc, cfg.pulse_duty_cycle);
+    return synth_tree(cfg.get_type_at(i), get_phase(), phase_inc, cfg.get_cycle());
 }
 
