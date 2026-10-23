@@ -70,12 +70,12 @@ private:
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
-    unsigned int ATK = 100;
-    unsigned int DEC = 250;
+    unsigned int ATK = 50;
+    unsigned int DEC = 333;
     unsigned int REL = 500;
     double SUS = 0.7;
-    double GAIN = 1.5;
-    double CYCLE = 0.25;
+    double GAIN = 2.00;
+    double CYCLE = 0.40;
 };
 
 class Oscillator_State {
@@ -122,7 +122,7 @@ public:
     double get_real_frequency(void) const { return real_freq; }
     void adsr(double dt);
     void reset_env(void) { env_value = 0.0; }
-    double run(double dt, int sample_rate);
+    double run(int sample_rate);
 
     std::vector<Oscillator_State>& get_oscs(void) { return oscs; }
 
@@ -136,13 +136,13 @@ private:
     double velocity = 0.0;
     unsigned int midi_key = 0;
     unsigned int state = OFF;
-    unsigned int portamento_time_ms = 200;
+    unsigned int portamento_time_ms = 33;
     double env_value = 0.0;
 };
 
 class Synth {
 public:
-    static constexpr size_t voice_count = 8;
+    static constexpr size_t voice_count = 16;
     static constexpr int sample_rate = 48000;
     static constexpr int channels = 1;
     Synth();

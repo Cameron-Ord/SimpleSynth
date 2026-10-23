@@ -26,7 +26,7 @@ void midi_callback(double delta_time, std::vector<unsigned char> *message, void 
         case NOTE_ON : {
             synth->voice_push_note(
                 midi_note_to_freq((*message)[NOTE]), 
-                midi_velocity_to_float((*message)[VELOCITY]),
+                normalized_amp_to_normalized_decibels((*message)[VELOCITY]),
                 (*message)[NOTE]
             );
         }break;

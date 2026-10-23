@@ -127,7 +127,7 @@ double Lfo::get_inc(int sample_rate) {
     return rate / sample_rate;
 }
 
-Synth::Synth() : osc_config(sample_rate, { SAW }), voices(voice_count, Voice(osc_config)) {}
+Synth::Synth() : osc_config(sample_rate, { SQUARE }), voices(voice_count, Voice(osc_config)) {}
 
 Voice::Voice(const Oscillator_Configuration& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
 
@@ -229,12 +229,11 @@ void Synth::voice_send_kill_signal(unsigned int midi_key) {
 }
 
 void Synth::run(size_t N, float *samples){
-    const double dt = 1.0 / sample_rate;
     for(int n = 0; n < N; n++){
         double frame_sample = 0.0;
         for(auto it = voices.begin(); it != voices.end(); ++it){
             if(it->get_state() != OFF){
-                frame_sample += it->run(dt, sample_rate);
+                frame_sample += it->run(sample_rate);
             } else {
                 continue;
             }
@@ -244,21 +243,29 @@ void Synth::run(size_t N, float *samples){
     compressor(N, samples);
 }
 
-double Voice::run(double dt, int sample_rate) {
+double Voice::run(int sample_rate) {
+    const int over_sampling = 2;
+    const double over_sampled_rate = sample_rate * over_sampling;
+    const double dt = 1.0 / over_sampled_rate;
+    //Things done in normal time
     adsr(dt);
-
-    double voice_sample = 0.0;
     const double GAIN = cfg.get_gain();
-    const double coeff = 1.0 / ms_to_ticks(50, sample_rate);
+    const double coeff = 1.0 / ms_to_ticks(portamento_time_ms, sample_rate);
     real_freq = clamp_exponential(EPS, target_freq, step(target_freq, real_freq, coeff));
-    for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
-        voice_sample += oscs[i].run(cfg, i, real_freq, sample_rate);
-    }
 
-    filter[FILTER_PRE] = low_pass_filter(dt, 8000.0, voice_sample, filter[FILTER_PRE]);
-    const double distorted = tanh(filter[FILTER_PRE] * GAIN);
-    filter[FILTER_POST] = low_pass_filter(dt, 4000.0, distorted, filter[FILTER_POST]);
-    return env_mult(filter[FILTER_POST]) * velocity;
+    double accumulator = 0.0;
+    for(int c = 0; c < over_sampling; c++){
+        double voice_sample = 0.0;
+        for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
+            voice_sample += oscs[i].run(cfg, i, real_freq, over_sampled_rate);
+        }
+
+        filter[FILTER_PRE] = low_pass_filter(dt, 16000.0, voice_sample, filter[FILTER_PRE]);
+        const double distorted = tanh(filter[FILTER_PRE] * GAIN);
+        filter[FILTER_POST] = low_pass_filter(dt, 4000.0, distorted, filter[FILTER_POST]);
+        accumulator += filter[FILTER_POST];
+    }
+    return env_mult(accumulator / over_sampling) * velocity;
 }
 
 double Oscillator_State::run(const Oscillator_Configuration& cfg, size_t i, double freq, double sample_rate) {

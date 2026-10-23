@@ -2,8 +2,9 @@
 #include <cmath>
 #include <memory>
 #include <cstddef>
+#include <iostream>
 
-static constexpr unsigned int midi_range_max = 127;
+static constexpr unsigned int midi_velocity_max = 127;
 
 // https://en.wikipedia.org/wiki/MIDI_tuning_standard
 // https://caml.music.mcgill.ca/~gary/307/week1/node11.html
@@ -12,8 +13,28 @@ double midi_note_to_freq(unsigned int note){
     return 440.0 * std::exp((std::log(2) / 12) * (static_cast<double>(note) - 69.0));
 }
 
-double midi_velocity_to_float(unsigned int velocity){
-    return static_cast<double>(velocity) / midi_range_max;
+//https://ccrma.stanford.edu/~jos//thms/Decibels.html
+//Using log10 and squared normalized ampitude value
+double squared_log10(double normalized) {
+    return log10(normalized * normalized);
+}
+
+double undo_log_10(double log) {
+    const double base = 10.0;
+    return std::pow(base, log);
+}
+
+double normalize_decibels(double db, double factor, double db_min, double db_max){
+    return (db - db_min) / (db_max - db_min);
+}
+
+double normalized_amp_to_normalized_decibels(unsigned int velocity, double factor) {
+    const double decibels = factor * std::log10(normalized_midi_velocity(velocity));
+    return normalize_decibels(decibels, factor);
+}
+
+double normalized_midi_velocity(unsigned int velocity){
+    return static_cast<double>(velocity) / midi_velocity_max;
 }
 
 double ms_to_ticks(unsigned int ms, int sample_rate) {
