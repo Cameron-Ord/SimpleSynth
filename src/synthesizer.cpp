@@ -98,6 +98,25 @@ static double low_pass_filter(double dt, double cutoff_hz, double current, doubl
 
     return step(current, prev, alpha);
 }
+// https://www.musicdsp.org/en/latest/Filters/142-state-variable-filter-chamberlin-version.html
+// https://www.earlevel.com/main/2003/03/02/the-digital-state-variable-filter/
+// f = 2 * sin((PI * Fc) / SAMPLE_RATE) or f = 2 * sin(PI * Fc * dt) since dt = 1.0 / sample_rate
+// where Fc is corner/cutoff in Hz
+// Q(resonance) ranges from 0.5 to inf
+double Voice::state_variable_filter(double input, double cutoff, double dt, double Q){
+    const double tuning = 2.0 * sin(PI * cutoff * dt);
+    const double q = 1.0 / Q;
+
+    const double low = filter[FILTER_SVF_DELAY_LOWPASS] + tuning * filter[FILTER_SVF_DELAY_BANDPASS];
+    const double high = input - low - q * filter[FILTER_SVF_DELAY_BANDPASS];
+    const double band = tuning * high + filter[FILTER_SVF_DELAY_BANDPASS];
+    const double notch = high + low;
+
+    filter[FILTER_SVF_DELAY_BANDPASS] = band;
+    filter[FILTER_SVF_DELAY_LOWPASS] = low;
+
+    return low;
+}
 
 static double naive_sine_wave(double phase) {
     return sin(2.0f * PI * phase);
@@ -197,20 +216,33 @@ void Voice::adsr(double dt){
     }
 }
 
+void Voice::reset_filters(){
+    for(size_t i = 0; i < filter.size(); i++){
+        filter[i] = 0.0;
+    }
+}
+
+bool Voice::new_note_reset(double _freq, double _velocity, unsigned int _midi_key){
+    if(state == OFF){
+        set_target_frequency(_freq);
+        set_real_frequency(get_prev_frequency() != dead_freq ? get_prev_frequency() : _freq);
+        set_velocity(_velocity);
+        for(auto it = get_oscs().begin(); it != get_oscs().end(); ++it){
+            it->reset();
+        }
+        reset_env();
+        reset_filters();
+        set_key(_midi_key);
+        set_state(ATTACKING);
+        return true;
+    } else {
+        return false;
+    }
+}
+
 void Synth::voice_push_note(double freq, double velocity, unsigned int midi_key) {
     for(auto it = voices.begin(); it != voices.end(); ++it) {
-        Voice& v = *it;
-        if(v.get_state() == OFF){
-            v.set_target_frequency(freq);
-            v.set_real_frequency(v.get_prev_frequency() != v.dead_freq ? v.get_prev_frequency() : freq);
-            v.set_velocity(velocity);
-            for(auto osc_it = v.get_oscs().begin(); osc_it != v.get_oscs().end(); ++osc_it){
-                Oscillator_State& osc = *osc_it;
-                osc.reset();
-            }
-            v.reset_env();
-            v.set_key(midi_key);
-            v.set_state(ATTACKING);
+        if(it->new_note_reset(freq, velocity, midi_key)){
             return;
         }
     }
@@ -243,13 +275,29 @@ void Synth::run(size_t N, float *samples){
     compressor(N, samples);
 }
 
+double Voice::run_low_pass(double dt, double voice_sample){
+    const double GAIN = cfg.get_gain();
+    switch(distortion_enabled){
+        default: return 0.0;
+        case DISTORTION_ENABLED:{
+            filter[FILTER_PRE_DIST] = low_pass_filter(dt, 16000.0, voice_sample, filter[FILTER_PRE_DIST]);
+            filter[FILTER_POST_DIST] = low_pass_filter(dt, 16000.0, tanh(filter[FILTER_PRE_DIST] * GAIN), filter[FILTER_POST_DIST]);
+            return filter[FILTER_POST_DIST];
+        }break;
+
+        case DISTORTION_DISABLED:{
+            filter[FILTER_PRE_DIST] = low_pass_filter(dt, 16000.0, voice_sample, filter[FILTER_PRE_DIST]);
+            return filter[FILTER_PRE_DIST];
+        }break;
+    }
+}
+
 double Voice::run(int sample_rate) {
     const int over_sampling = 2;
     const double over_sampled_rate = sample_rate * over_sampling;
     const double dt = 1.0 / over_sampled_rate;
     //Things done in normal time
     adsr(dt);
-    const double GAIN = cfg.get_gain();
     const double coeff = 1.0 / ms_to_ticks(portamento_time_ms, sample_rate);
     real_freq = clamp_exponential(EPS, target_freq, step(target_freq, real_freq, coeff));
 
@@ -260,10 +308,10 @@ double Voice::run(int sample_rate) {
             voice_sample += oscs[i].run(cfg, i, real_freq, over_sampled_rate);
         }
 
-        filter[FILTER_PRE] = low_pass_filter(dt, 16000.0, voice_sample, filter[FILTER_PRE]);
-        const double distorted = tanh(filter[FILTER_PRE] * GAIN);
-        filter[FILTER_POST] = low_pass_filter(dt, 4000.0, distorted, filter[FILTER_POST]);
-        accumulator += filter[FILTER_POST];
+        const double lowpass_sample = run_low_pass(dt, voice_sample);
+        const double state_variable_out = state_variable_filter(lowpass_sample, 4000.0, dt, 0.707);
+        accumulator += state_variable_out;
+        // accumulator += lowpass_sample;
     }
     return env_mult(accumulator / over_sampling) * velocity;
 }

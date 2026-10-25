@@ -10,7 +10,7 @@ static constexpr unsigned int midi_velocity_max = 127;
 // https://caml.music.mcgill.ca/~gary/307/week1/node11.html
 
 double midi_note_to_freq(unsigned int note){
-    return 440.0 * std::exp((std::log(2) / 12) * (static_cast<double>(note) - 69.0));
+    return 440.0 * std::exp((std::log(2) / 12) * (static_cast<double>(note) - 69.0 /*funny number*/));
 }
 
 //https://ccrma.stanford.edu/~jos//thms/Decibels.html
@@ -23,7 +23,7 @@ double undo_log_10(double log) {
     const double base = 10.0;
     return std::pow(base, log);
 }
-
+// value - min / max - min
 double normalize_decibels(double db, double factor, double db_min, double db_max){
     return (db - db_min) / (db_max - db_min);
 }

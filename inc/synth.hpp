@@ -20,9 +20,16 @@ enum Envelope_States : unsigned int {
 };
 
 enum Indexes {
-    FILTER_PRE = 0,
-    FILTER_POST,
+    FILTER_PRE_DIST = 0,
+    FILTER_POST_DIST,
+    FILTER_SVF_DELAY_BANDPASS,
+    FILTER_SVF_DELAY_LOWPASS,
     INDEXES_SIZE
+};
+
+enum Settings {
+    DISTORTION_DISABLED = 0,
+    DISTORTION_ENABLED,
 };
 
 class Voice;
@@ -71,10 +78,10 @@ private:
     double decay_rate = 0.0;
     double release_rate = 0.0;
     unsigned int ATK = 50;
-    unsigned int DEC = 333;
-    unsigned int REL = 500;
+    unsigned int DEC = 150;
+    unsigned int REL = 200;
     double SUS = 0.7;
-    double GAIN = 2.00;
+    double GAIN = 5.0;
     double CYCLE = 0.40;
 };
 
@@ -107,6 +114,9 @@ public:
     Voice(const Oscillator_Configuration& _cfg);
     ~Voice() = default;
 
+    void reset_filters(void);
+    bool new_note_reset(double _freq, double _velocity, unsigned int _midi_key);
+    double state_variable_filter(double input, double cutoff, double dt, double Q);
     unsigned int get_state(void) const { return state; }
     void set_state(unsigned int _state) { state = _state; }
     void set_target_frequency(double f) { target_freq = f; }
@@ -123,6 +133,7 @@ public:
     void adsr(double dt);
     void reset_env(void) { env_value = 0.0; }
     double run(int sample_rate);
+    double run_low_pass(double dt, double voice_sample);
 
     std::vector<Oscillator_State>& get_oscs(void) { return oscs; }
 
@@ -136,8 +147,9 @@ private:
     double velocity = 0.0;
     unsigned int midi_key = 0;
     unsigned int state = OFF;
-    unsigned int portamento_time_ms = 33;
+    unsigned int portamento_time_ms = 10;
     double env_value = 0.0;
+    unsigned int distortion_enabled = DISTORTION_DISABLED;
 };
 
 class Synth {

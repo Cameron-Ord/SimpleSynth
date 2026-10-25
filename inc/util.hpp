@@ -13,7 +13,7 @@ double ms_to_seconds(unsigned int ms);
 unsigned int seconds_to_ms(double s);
 double squared_log10(double normalized);
 double undo_log_10(double log);
-double normalize_decibels(double DB, double factor = 20.0, double db_min = -60.0, double db_max = 0.0);
+double normalize_decibels(double DB, double factor = 20.0, double db_min = -48.0, double db_max = 0.0);
 double normalized_amp_to_normalized_decibels(unsigned int velocity, double factor = 20.0);
 
 template <typename T>
