@@ -146,7 +146,7 @@ double Lfo::get_inc(int sample_rate) {
     return rate / sample_rate;
 }
 
-Synth::Synth() : osc_config(sample_rate, { SQUARE }), voices(voice_count, Voice(osc_config)) {}
+Synth::Synth() : osc_config(sample_rate, { SAW }), voices(voice_count, Voice(osc_config)) {}
 
 Voice::Voice(const Oscillator_Configuration& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
 
@@ -277,7 +277,7 @@ void Synth::run(size_t N, float *samples){
 
 double Voice::run_low_pass(double dt, double voice_sample){
     const double GAIN = cfg.get_gain();
-    switch(distortion_enabled){
+    switch(cfg.get_distortion_state()){
         default: return 0.0;
         case DISTORTION_ENABLED:{
             filter[FILTER_PRE_DIST] = low_pass_filter(dt, 16000.0, voice_sample, filter[FILTER_PRE_DIST]);
@@ -298,6 +298,10 @@ double Voice::run(int sample_rate) {
     const double dt = 1.0 / over_sampled_rate;
     //Things done in normal time
     adsr(dt);
+    const double base_cutoff_hz = 500.0;
+    const double max_cutoff_hz = 3500.0;
+    const double m_cutoff = base_cutoff_hz + (env_value * max_cutoff_hz);
+    // Portamento freq stepping
     const double coeff = 1.0 / ms_to_ticks(portamento_time_ms, sample_rate);
     real_freq = clamp_exponential(EPS, target_freq, step(target_freq, real_freq, coeff));
 
@@ -309,7 +313,7 @@ double Voice::run(int sample_rate) {
         }
 
         const double lowpass_sample = run_low_pass(dt, voice_sample);
-        const double state_variable_out = state_variable_filter(lowpass_sample, 4000.0, dt, 0.707);
+        const double state_variable_out = state_variable_filter(lowpass_sample, m_cutoff, dt, 0.707);
         accumulator += state_variable_out;
         // accumulator += lowpass_sample;
     }

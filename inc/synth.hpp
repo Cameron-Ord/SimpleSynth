@@ -71,9 +71,11 @@ public:
     double get_decay(void) const { return DEC; }
     double get_release(void) const { return REL; }
     double get_cycle(void) const { return CYCLE; }
+    unsigned int get_distortion_state(void) const { return distortion_enabled; }
 
 private:
     std::vector<size_t> types;
+    unsigned int distortion_enabled = DISTORTION_ENABLED;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
@@ -81,7 +83,7 @@ private:
     unsigned int DEC = 150;
     unsigned int REL = 200;
     double SUS = 0.7;
-    double GAIN = 5.0;
+    double GAIN = 2.5;
     double CYCLE = 0.40;
 };
 
@@ -147,9 +149,8 @@ private:
     double velocity = 0.0;
     unsigned int midi_key = 0;
     unsigned int state = OFF;
-    unsigned int portamento_time_ms = 10;
+    unsigned int portamento_time_ms = 25;
     double env_value = 0.0;
-    unsigned int distortion_enabled = DISTORTION_DISABLED;
 };
 
 class Synth {
