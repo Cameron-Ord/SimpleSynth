@@ -15,9 +15,9 @@ static double poly_blep(double t, double dt);
 static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle, double amplitude);
 
 static const std::vector<Oscillator> DEFAULT_OSCILLATOR_LIST = { 
-    //Oscillator(SAW, 0.99, 0.8, 1.0),
-  //  Oscillator(SAW, 1.01, 0.8, 1.0),
-    Oscillator(SINE, 1.0, 1.0, 1.0)
+    Oscillator(SAW, 0.99, 0.8, 1.0),
+    Oscillator(SAW, 1.01, 0.8, 1.0),
+    Oscillator(SQUARE, 1.0, 0.4, 1.0)
 };
 
 //https://www.martin-finke.de/articles/audio-plugins-018-polyblep-oscillator/
@@ -310,18 +310,23 @@ void Synth::run(size_t N, float *samples){
 }
 
 double Voice::run_low_pass(double dt, double voice_sample){
-    const double GAIN = cfg.get_gain();
-    switch(cfg.get_distortion_state()){
-        default: return 0.0;
-        case DISTORTION_ENABLED:{
-            filter[FILTER_ONE_POLE] = low_pass_filter(dt, ONE_POLE_HZ, voice_sample, filter[FILTER_ONE_POLE]);
-            return tanh(filter[FILTER_ONE_POLE] * GAIN);
-        }break;
+    filter[FILTER_ONE_POLE] = low_pass_filter(dt, ONE_POLE_HZ, voice_sample, filter[FILTER_ONE_POLE]);
+    return filter[FILTER_ONE_POLE];
+}
 
-        case DISTORTION_DISABLED:{
-            filter[FILTER_ONE_POLE] = low_pass_filter(dt, ONE_POLE_HZ, voice_sample, filter[FILTER_ONE_POLE]);
-            return filter[FILTER_ONE_POLE];
-        }break;
+double Voice::apply_drive(double sample){
+    if(cfg.get_distortion_state() & PRE_DRIVE_ENABLED){
+        return tanh(sample * cfg.get_drive());
+    } else {
+        return sample;
+    }
+}
+
+double Voice::apply_gain(double sample){
+    if(cfg.get_distortion_state() & DISTORTION_ENABLED){
+        return tanh(sample * cfg.get_gain());
+    } else {
+        return sample;
     }
 }
 
@@ -346,9 +351,12 @@ double Voice::run(int sample_rate) {
             voice_sample += oscs[i].run(osc, real_freq, over_sampled_rate);
         }
 
-        const double lowpass_sample = run_low_pass(dt, voice_sample);
+        const double driven = apply_drive(voice_sample);
+        const double lowpass_sample = run_low_pass(dt, driven);
         const double state_variable_out = state_variable_filter(lowpass_sample, svf_cutoff_hz, dt, cfg.get_svf_resonance());
-        accumulator += state_variable_out;
+        const double clipped = apply_gain(state_variable_out);
+
+        accumulator += clipped;
         // accumulator += lowpass_sample;
     }
     return env_mult(accumulator / over_sampling) * velocity;

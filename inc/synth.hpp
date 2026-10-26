@@ -30,8 +30,8 @@ enum Indexes {
 };
 
 enum Settings {
-    DISTORTION_DISABLED = 0,
-    DISTORTION_ENABLED,
+    DISTORTION_ENABLED = 0,
+    PRE_DRIVE_ENABLED,
 };
 
 class Voice;
@@ -99,6 +99,7 @@ public:
     double get_decay_rate(void) const { return decay_rate; }
     double get_release_rate(void) const { return release_rate; }
 
+    double get_drive(void) const { return DRIVE; }
     double get_gain(void) const { return GAIN; }
     double get_sustain(void) const { return SUS; }
     double get_attack(void) const { return ATK; }
@@ -111,17 +112,18 @@ public:
 
 private:
     std::vector<Oscillator> oscillator_list;
-    unsigned int distortion_enabled = DISTORTION_DISABLED;
+    unsigned int distortion_enabled = DISTORTION_ENABLED | PRE_DRIVE_ENABLED;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
-    unsigned int ATK = 500;
+    unsigned int ATK = 50;
     unsigned int DEC = 150;
     unsigned int REL = 200;
     double SUS = 0.7;
-    double GAIN = 2.0;
+    double DRIVE = 2.0;
+    double GAIN = 5.0;
     double svf_filter_base_cutoff = 1000.0;
-    double svf_filter_max_cutoff = 2500.0;
+    double svf_filter_max_cutoff = 4000.0;
     double svf_resonance = 0.75;
 };
 
@@ -153,6 +155,8 @@ public:
     Voice(const Synth_Parameters& _cfg);
     ~Voice() = default;
 
+    double apply_drive(double sample);
+    double apply_gain(double sample);
     void reset_filters(void);
     bool new_note_reset(double _freq, double _velocity, unsigned int _midi_key);
     double state_variable_filter(double input, double cutoff, double dt, double Q);
@@ -186,7 +190,7 @@ private:
     double velocity = 0.0;
     unsigned int midi_key = 0;
     unsigned int state = OFF;
-    unsigned int portamento_time_ms = 100;
+    unsigned int portamento_time_ms = 10;
     double env_value = 0.0;
 };
 
