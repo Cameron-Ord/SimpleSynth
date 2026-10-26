@@ -17,9 +17,9 @@ static double synth_tree(size_t type, double phase, double phase_inc, double pul
 
 static const std::vector<Oscillator> DEFAULT_OSCILLATOR_LIST = { 
     Oscillator(SAW, 1.0, 0.9, 1.0),
-    Oscillator(SAW, 0.99, 0.7, 1.0),
-    Oscillator(SAW, 1.01, 0.7, 1.0),
-    Oscillator(SINE, 1.0, 0.6, 1.0)
+    Oscillator(SAW, 0.99, 0.8, 1.0),
+    Oscillator(SAW, 1.01, 0.8, 1.0),
+    Oscillator(SINE, 1.0, 0.7, 1.0)
 };
 
 //https://www.martin-finke.de/articles/audio-plugins-018-polyblep-oscillator/
@@ -300,14 +300,13 @@ double Voice::run_low_pass(double dt, double voice_sample){
     switch(cfg.get_distortion_state()){
         default: return 0.0;
         case DISTORTION_ENABLED:{
-            filter[FILTER_PRE_DIST] = low_pass_filter(dt, 16000.0, voice_sample, filter[FILTER_PRE_DIST]);
-            filter[FILTER_POST_DIST] = low_pass_filter(dt, 16000.0, tanh(filter[FILTER_PRE_DIST] * GAIN), filter[FILTER_POST_DIST]);
-            return filter[FILTER_POST_DIST];
+            filter[FILTER_ONE_POLE] = low_pass_filter(dt, ONE_POLE_HZ, voice_sample, filter[FILTER_ONE_POLE]);
+            return tanh(filter[FILTER_ONE_POLE] * GAIN);
         }break;
 
         case DISTORTION_DISABLED:{
-            filter[FILTER_PRE_DIST] = low_pass_filter(dt, 16000.0, voice_sample, filter[FILTER_PRE_DIST]);
-            return filter[FILTER_PRE_DIST];
+            filter[FILTER_ONE_POLE] = low_pass_filter(dt, ONE_POLE_HZ, voice_sample, filter[FILTER_ONE_POLE]);
+            return filter[FILTER_ONE_POLE];
         }break;
     }
 }

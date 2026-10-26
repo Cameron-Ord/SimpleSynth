@@ -20,8 +20,7 @@ enum Envelope_States : unsigned int {
 };
 
 enum Indexes {
-    FILTER_PRE_DIST = 0,
-    FILTER_POST_DIST,
+    FILTER_ONE_POLE = 0,
     FILTER_SVF_DELAY_BANDPASS,
     FILTER_SVF_DELAY_LOWPASS,
     INDEXES_SIZE
@@ -97,7 +96,7 @@ public:
 
 private:
     std::vector<Oscillator> oscillator_list;
-    unsigned int distortion_enabled = DISTORTION_DISABLED;
+    unsigned int distortion_enabled = DISTORTION_ENABLED;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
@@ -105,10 +104,10 @@ private:
     unsigned int DEC = 150;
     unsigned int REL = 200;
     double SUS = 0.7;
-    double GAIN = 2.5;
-    double svf_filter_base_cutoff = 500.0;
-    double svf_filter_max_cutoff = 4000.0;
-    double svf_resonance = 0.75;
+    double GAIN = 2.0;
+    double svf_filter_base_cutoff = 100.0;
+    double svf_filter_max_cutoff = 5000.0;
+    double svf_resonance = 0.707;
 };
 
 // Per voice state
@@ -133,6 +132,7 @@ private:
 
 class Voice {
 public:
+    static constexpr double ONE_POLE_HZ = 8000.0;
     static constexpr double dead_freq = 0.0;
     Voice(const Synth_Parameters& _cfg);
     ~Voice() = default;
