@@ -34,7 +34,7 @@ enum Settings {
 
 class Voice;
 class Oscillator_State;
-class Oscillator_Configuration;
+class Synth_Parameters;
 class Synth;
 class Lfo;
 
@@ -54,13 +54,33 @@ private:
     double depth = 3.0;
 };
 
-class Oscillator_Configuration {
-public:
-    Oscillator_Configuration(int sample_rate, std::vector<size_t> _types);
-    ~Oscillator_Configuration() = default;
 
-    size_t get_osc_count(void) const { return types.size(); }
-    size_t get_type_at(size_t i) const;
+class Oscillator {
+    public:
+        static constexpr double DETUNE_MAX = 1.1;
+        static constexpr double DETUNE_MIN = 0.9;
+        static constexpr double AMPLITUDE_MAX = 1.0;
+        static constexpr double AMPLITUDE_MIN = 0.0;
+        Oscillator(size_t _type, double _tuning, double _amplitude, double _pulse_cycles);
+        Oscillator(void) = default;
+        size_t get_type(void) const { return type; }
+        double get_amplitude(void) const { return amplitude; }
+        double get_tuning(void) const { return tuning; }
+        double get_pulse_cycle(void) const { return pulse_cycles; }
+    private:
+        size_t type = SQUARE;
+        double tuning = 1.0;
+        double amplitude = 1.0;
+        double pulse_cycles = 0.5;
+};
+
+class Synth_Parameters {
+public:
+    Synth_Parameters(int sample_rate, std::vector<Oscillator> _oscillator_list);
+    ~Synth_Parameters() = default;
+
+    size_t get_osc_count(void) const { return oscillator_list.size(); }
+    const Oscillator *const get_oscillator_at(size_t i) const;
     double get_attack_rate(void) const { return attack_rate; }
     double get_decay_rate(void) const { return decay_rate; }
     double get_release_rate(void) const { return release_rate; }
@@ -70,12 +90,14 @@ public:
     double get_attack(void) const { return ATK; }
     double get_decay(void) const { return DEC; }
     double get_release(void) const { return REL; }
-    double get_cycle(void) const { return CYCLE; }
     unsigned int get_distortion_state(void) const { return distortion_enabled; }
+    double get_svf_base_hz(void) const { return svf_filter_base_cutoff; }
+    double get_svf_max_hz(void) const { return svf_filter_max_cutoff; }
+    double get_svf_resonance(void) const { return svf_resonance; }
 
 private:
-    std::vector<size_t> types;
-    unsigned int distortion_enabled = DISTORTION_ENABLED;
+    std::vector<Oscillator> oscillator_list;
+    unsigned int distortion_enabled = DISTORTION_DISABLED;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
@@ -84,9 +106,12 @@ private:
     unsigned int REL = 200;
     double SUS = 0.7;
     double GAIN = 2.5;
-    double CYCLE = 0.40;
+    double svf_filter_base_cutoff = 500.0;
+    double svf_filter_max_cutoff = 4000.0;
+    double svf_resonance = 0.75;
 };
 
+// Per voice state
 class Oscillator_State {
 public:
     static constexpr double phase_max = 1.0;
@@ -99,21 +124,17 @@ public:
     double phase_increment(double inc);
     double get_phase(void) const { return phase; }
     double get_time(void) const { return time; }
-    Lfo& get_lfo1(void) { return lfo1; }
-    double run(const Oscillator_Configuration& cfg, size_t i, double freq, double sample_rate);
+    double run(const Oscillator *const osc, double freq, double sample_rate);
 
 private:
     double phase = 0.0;
     double time = 0.0;
-    Lfo lfo1;
-    Lfo lfo2;
-    Lfo lfo3;
 };
 
 class Voice {
 public:
     static constexpr double dead_freq = 0.0;
-    Voice(const Oscillator_Configuration& _cfg);
+    Voice(const Synth_Parameters& _cfg);
     ~Voice() = default;
 
     void reset_filters(void);
@@ -140,7 +161,7 @@ public:
     std::vector<Oscillator_State>& get_oscs(void) { return oscs; }
 
 private:
-    const Oscillator_Configuration& cfg;
+    const Synth_Parameters& cfg;
     std::vector<Oscillator_State> oscs;
     std::array<double, INDEXES_SIZE> filter{};
     double target_freq = dead_freq;
@@ -167,7 +188,7 @@ public:
     void voice_push_note(double freq, double velocity, unsigned int midi_key);
     void voice_send_kill_signal(unsigned int midi_key);
 private:
-    Oscillator_Configuration osc_config;
+    Synth_Parameters config;
     std::vector<Voice> voices;
 };
 

@@ -13,7 +13,14 @@ static double naive_triangle_wave(double phase);
 
 static double poly_blep(double t, double dt);
 static void compressor(size_t N, float *buffer);
-static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle);
+static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle, double amplitude);
+
+static const std::vector<Oscillator> DEFAULT_OSCILLATOR_LIST = { 
+    Oscillator(SAW, 1.0, 0.9, 1.0),
+    Oscillator(SAW, 0.99, 0.7, 1.0),
+    Oscillator(SAW, 1.01, 0.7, 1.0),
+    Oscillator(SINE, 1.0, 0.6, 1.0)
+};
 
 //https://www.martin-finke.de/articles/audio-plugins-018-polyblep-oscillator/
 //https://www.metafunction.co.uk/post/all-about-digital-oscillators-part-2-blits-bleps
@@ -29,26 +36,26 @@ static double poly_blep(double t, double dt) {
     }
 } 
 
-static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle) {
+static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle, double amplitude) {
     // Don't need to normalize by 2.0 * PI since things are already 0..1
     const double t = phase;
     const double dt = phase_inc;
     switch(type) {
         default: return 0.0;
         case SINE : {
-            return naive_sine_wave(phase);
+            return naive_sine_wave(phase) * amplitude;
         }break;
         case SAW : {
-            return naive_saw_wave(phase) - poly_blep(t, dt);
+            return (naive_saw_wave(phase) - poly_blep(t, dt)) * amplitude;
         }break;
         case SQUARE : {
-            return naive_square_wave(phase, 0.5) + poly_blep(t, dt) - poly_blep(fmod(t + 0.5, 1.0), dt);
+            return (naive_square_wave(phase, 0.5) + poly_blep(t, dt) - poly_blep(fmod(t + 0.5, 1.0), dt)) * amplitude;
         }break;
         case TRIANGLE : {
-            return naive_triangle_wave(phase);
+            return naive_triangle_wave(phase) * amplitude;
         }break;
         case PULSE: {
-            return naive_square_wave(phase, pulse_cycle) + poly_blep(t, dt) - poly_blep(fmod(t + (1.0 - pulse_cycle), 1.0), dt);
+            return (naive_square_wave(phase, pulse_cycle) + poly_blep(t, dt) - poly_blep(fmod(t + (1.0 - pulse_cycle), 1.0), dt)) * amplitude;
         }break;
     }
 }
@@ -146,23 +153,36 @@ double Lfo::get_inc(int sample_rate) {
     return rate / sample_rate;
 }
 
-Synth::Synth() : osc_config(sample_rate, { SAW }), voices(voice_count, Voice(osc_config)) {}
+Synth::Synth() : config(sample_rate, DEFAULT_OSCILLATOR_LIST), voices(voice_count, Voice(config)) {}
 
-Voice::Voice(const Oscillator_Configuration& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
+Oscillator::Oscillator(size_t _type, double _tuning, double _amplitude, double _pulse_cycles) : type(_type), tuning(_tuning), amplitude(_amplitude), pulse_cycles(_pulse_cycles) {
+    if(tuning > DETUNE_MAX) {
+        tuning = DETUNE_MAX;
+    } else if(tuning < DETUNE_MIN) {
+        tuning = DETUNE_MIN;
+    }
 
-Oscillator_Configuration::Oscillator_Configuration(int sample_rate, std::vector<size_t> _types) : types(_types) {
+    if(amplitude > AMPLITUDE_MAX) {
+        amplitude = AMPLITUDE_MAX;
+    } else if (amplitude < AMPLITUDE_MIN){
+        amplitude = AMPLITUDE_MIN;
+    }
+}
+
+Voice::Voice(const Synth_Parameters& _cfg) : cfg(_cfg), oscs(_cfg.get_osc_count(), Oscillator_State()){}
+
+Synth_Parameters::Synth_Parameters(int sample_rate, std::vector<Oscillator> _oscillator_list) : oscillator_list(_oscillator_list) {
     attack_rate = 1.0 / ms_to_ticks(ATK, sample_rate);
     decay_rate = 1.0 / ms_to_ticks(DEC, sample_rate);
     release_rate = 1.0 / ms_to_ticks(REL, sample_rate);
 }
 
-size_t Oscillator_Configuration::get_type_at(size_t i) const {
-    if(i < types.size()){
-        return types[i];
+const Oscillator *const Synth_Parameters::get_oscillator_at(size_t i) const {
+    if(i < oscillator_list.size()){
+        return &oscillator_list[i];
     }
-    return SAW;
+    return nullptr;
 }
-
 
 void Oscillator_State::reset(void){
     phase = 0.0;
@@ -298,10 +318,7 @@ double Voice::run(int sample_rate) {
     const double dt = 1.0 / over_sampled_rate;
     //Things done in normal time
     adsr(dt);
-    const double base_cutoff_hz = 500.0;
-    const double max_cutoff_hz = 3500.0;
-    const double m_cutoff = base_cutoff_hz + (env_value * max_cutoff_hz);
-    // Portamento freq stepping
+    const double svf_cutoff_hz = cfg.get_svf_base_hz() + (env_value * cfg.get_svf_max_hz());
     const double coeff = 1.0 / ms_to_ticks(portamento_time_ms, sample_rate);
     real_freq = clamp_exponential(EPS, target_freq, step(target_freq, real_freq, coeff));
 
@@ -309,20 +326,25 @@ double Voice::run(int sample_rate) {
     for(int c = 0; c < over_sampling; c++){
         double voice_sample = 0.0;
         for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
-            voice_sample += oscs[i].run(cfg, i, real_freq, over_sampled_rate);
+            const Oscillator *const osc = cfg.get_oscillator_at(i);
+            if(!osc) { 
+                continue;
+            }
+            voice_sample += oscs[i].run(osc, real_freq, over_sampled_rate);
         }
 
         const double lowpass_sample = run_low_pass(dt, voice_sample);
-        const double state_variable_out = state_variable_filter(lowpass_sample, m_cutoff, dt, 0.707);
+        const double state_variable_out = state_variable_filter(lowpass_sample, svf_cutoff_hz, dt, cfg.get_svf_resonance());
         accumulator += state_variable_out;
         // accumulator += lowpass_sample;
     }
     return env_mult(accumulator / over_sampling) * velocity;
 }
 
-double Oscillator_State::run(const Oscillator_Configuration& cfg, size_t i, double freq, double sample_rate) {
-    const double phase_inc = freq / sample_rate;
-    set_phase(phase_increment(phase_inc));
-    return synth_tree(cfg.get_type_at(i), get_phase(), phase_inc, cfg.get_cycle());
+double Oscillator_State::run(const Oscillator* const osc, double freq, double sample_rate) {
+    const double modulated = freq * osc->get_tuning();
+    const double phase_inc = modulated / sample_rate;
+    phase = phase_increment(phase_inc);
+    return synth_tree(osc->get_type(), phase, phase_inc, osc->get_pulse_cycle(), osc->get_amplitude());
 }
 
