@@ -23,7 +23,10 @@ enum Indexes {
     FILTER_ONE_POLE = 0,
     FILTER_SVF_DELAY_BANDPASS,
     FILTER_SVF_DELAY_LOWPASS,
-    INDEXES_SIZE
+    INDEXES_SIZE,
+
+    LFO_VIBRATO = 0,
+    LFO_SIZE
 };
 
 enum Settings {
@@ -37,6 +40,17 @@ class Synth_Parameters;
 class Synth;
 class Lfo;
 
+class Compressor {
+public:
+    Compressor(void) = default;
+    void block_compressor(size_t N, float *buffer);
+    void compressor(size_t N, float *buffer);
+private:
+    double envelope = 0.0;
+    double attack = 0.1;
+    double release = 0.0001;
+};
+
 class Lfo {
 public:
     static constexpr double phase_max = 1.0;
@@ -47,10 +61,11 @@ public:
     double increment(double inc);
     void set_phase(double p) { phase = p; }
     double get_phase(void) { return phase; }
+    double run(int sample_rate);
 private:
     double phase = 0.0;
-    double rate = 6.0;
-    double depth = 3.0;
+    double rate = 6.5;
+    double depth = 2.0;
 };
 
 
@@ -96,18 +111,18 @@ public:
 
 private:
     std::vector<Oscillator> oscillator_list;
-    unsigned int distortion_enabled = DISTORTION_ENABLED;
+    unsigned int distortion_enabled = DISTORTION_DISABLED;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
-    unsigned int ATK = 50;
+    unsigned int ATK = 500;
     unsigned int DEC = 150;
     unsigned int REL = 200;
     double SUS = 0.7;
     double GAIN = 2.0;
-    double svf_filter_base_cutoff = 100.0;
-    double svf_filter_max_cutoff = 5000.0;
-    double svf_resonance = 0.707;
+    double svf_filter_base_cutoff = 1000.0;
+    double svf_filter_max_cutoff = 2500.0;
+    double svf_resonance = 0.75;
 };
 
 // Per voice state
@@ -128,6 +143,7 @@ public:
 private:
     double phase = 0.0;
     double time = 0.0;
+    std::array<Lfo, LFO_SIZE> lfo{}; 
 };
 
 class Voice {
@@ -170,7 +186,7 @@ private:
     double velocity = 0.0;
     unsigned int midi_key = 0;
     unsigned int state = OFF;
-    unsigned int portamento_time_ms = 25;
+    unsigned int portamento_time_ms = 100;
     double env_value = 0.0;
 };
 
@@ -190,6 +206,7 @@ public:
 private:
     Synth_Parameters config;
     std::vector<Voice> voices;
+    Compressor comp;
 };
 
 #endif

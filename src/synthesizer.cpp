@@ -12,14 +12,12 @@ static double naive_square_wave(double phase, double cycle);
 static double naive_triangle_wave(double phase);
 
 static double poly_blep(double t, double dt);
-static void compressor(size_t N, float *buffer);
 static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle, double amplitude);
 
 static const std::vector<Oscillator> DEFAULT_OSCILLATOR_LIST = { 
-    Oscillator(SAW, 1.0, 0.9, 1.0),
-    Oscillator(SAW, 0.99, 0.8, 1.0),
-    Oscillator(SAW, 1.01, 0.8, 1.0),
-    Oscillator(SINE, 1.0, 0.7, 1.0)
+    //Oscillator(SAW, 0.99, 0.8, 1.0),
+  //  Oscillator(SAW, 1.01, 0.8, 1.0),
+    Oscillator(SINE, 1.0, 1.0, 1.0)
 };
 
 //https://www.martin-finke.de/articles/audio-plugins-018-polyblep-oscillator/
@@ -60,11 +58,27 @@ static double synth_tree(size_t type, double phase, double phase_inc, double pul
     }
 }
 
+void Compressor::compressor(size_t N, float *buffer) {
+    const double th = 0.85;
+    for(size_t n = 0; n < N; n++){
+        const double aval = std::abs(buffer[n]);
+        if(aval > envelope){
+            envelope = step(aval, envelope, attack);
+        } else {
+            envelope = step(aval, envelope, release);
+        }
+
+        if(envelope > th){
+            buffer[n] *= (th / envelope);
+        }
+    }
+}
+
 constexpr double neutral = 1.0;
-constexpr double falloff = 0.01;
+constexpr double falloff = 0.001;
 
 //https://github.com/mmitch/syndig/blob/master/src/compressor.c
-static void compressor(size_t N, float *buffer){
+void Compressor::block_compressor(size_t N, float *buffer){
     static bool compressing = false;
     static double compression = neutral;
     double min = 0.0;
@@ -292,7 +306,7 @@ void Synth::run(size_t N, float *samples){
         }
         samples[n] = static_cast<float>(frame_sample);
     }
-    compressor(N, samples);
+    comp.compressor(N, samples);
 }
 
 double Voice::run_low_pass(double dt, double voice_sample){
@@ -315,14 +329,14 @@ double Voice::run(int sample_rate) {
     const int over_sampling = 2;
     const double over_sampled_rate = sample_rate * over_sampling;
     const double dt = 1.0 / over_sampled_rate;
-    //Things done in normal time
-    adsr(dt);
     const double svf_cutoff_hz = cfg.get_svf_base_hz() + (env_value * cfg.get_svf_max_hz());
-    const double coeff = 1.0 / ms_to_ticks(portamento_time_ms, sample_rate);
-    real_freq = clamp_exponential(EPS, target_freq, step(target_freq, real_freq, coeff));
 
     double accumulator = 0.0;
     for(int c = 0; c < over_sampling; c++){
+        adsr(dt);
+        const double coeff = 1.0 / ms_to_ticks(portamento_time_ms, over_sampled_rate);
+        real_freq = clamp_exponential(EPS, target_freq, step(target_freq, real_freq, coeff));
+
         double voice_sample = 0.0;
         for(size_t i = 0; i < oscs.size() && i < cfg.get_osc_count(); i++){
             const Oscillator *const osc = cfg.get_oscillator_at(i);
@@ -341,9 +355,15 @@ double Voice::run(int sample_rate) {
 }
 
 double Oscillator_State::run(const Oscillator* const osc, double freq, double sample_rate) {
-    const double modulated = freq * osc->get_tuning();
-    const double phase_inc = modulated / sample_rate;
+    freq *= osc->get_tuning();
+    const double phase_inc = freq / sample_rate;
     phase = phase_increment(phase_inc);
     return synth_tree(osc->get_type(), phase, phase_inc, osc->get_pulse_cycle(), osc->get_amplitude());
 }
 
+double Lfo::run(int sample_rate) {
+    const double value = sinusoid();
+    const double inc = get_inc(sample_rate);
+    set_phase(increment(inc));
+    return value;
+}
