@@ -45,17 +45,17 @@ public:
     Compressor(void) = default;
     void block_compressor(size_t N, float *buffer);
     void clip_buffer(size_t N, float *buffer);
+    bool get_state(void) const { return compressing; }
     unsigned int get_flags(void) const { return flags; }
     double get_compressor_gain(void) const { return gain; }
-    double get_compressor_envelope(void) const { return envelope; }
     double get_compressor_attack(void) const { return attack; }
     double get_compressor_release(void) const { return release; }
 private:
     unsigned int flags = DISTORTION_ENABLED | USE_SOFT_CLIPPING;
-    double gain = 8.0;
-    double envelope = 0.0;
-    double attack = 0.005;
-    double release = 0.001;
+    bool compressing = false;
+    double gain = 2.5;
+    double attack = 0.05;
+    double release = 0.01;
 };
 
 class Lfo {

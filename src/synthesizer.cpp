@@ -74,9 +74,6 @@ void Compressor::clip_buffer(size_t N, float *buffer) {
 //https://github.com/mmitch/syndig/blob/master/src/compressor.c
 void Compressor::block_compressor(size_t N, float *buffer){
     const double neutral = 1.0;
-    const double falloff = 0.001;
-
-    static bool compressing = false;
     static double compression = neutral;
     double min = 0.0;
     double max = 0.0;
@@ -89,12 +86,12 @@ void Compressor::block_compressor(size_t N, float *buffer){
     }
     max = std::max(max, -min);
     if(max > compression){
-        compression = max;
+        compression = step(max, compression, attack);
         if(!compressing){
             compressing = true;
         }
     } else if(compression > neutral) {
-        compression = std::max(compression - falloff, neutral);
+        compression = std::max(compression - release, neutral);
         if(compression == neutral){
             compressing = false;
         }
@@ -292,18 +289,18 @@ void Synth::voice_send_kill_signal(unsigned int midi_key) {
 }
 
 void Synth::run(size_t N, float *samples){
-    const size_t voice_count = voices.size();
     for(int n = 0; n < N; n++){
         double frame_sample = 0.0;
-        for(size_t voice = 0; voice < voice_count; ++voice){
+        for(size_t voice = 0; voice < voices.size(); ++voice){
             if(voices[voice].get_state() != OFF){
                 frame_sample += voices[voice].run(sample_rate);
             } else {
                 continue;
             }
         }
-        samples[n] = static_cast<float>(frame_sample / voice_count);
+        samples[n] = static_cast<float>(frame_sample);
     }
+    comp.block_compressor(N, samples);
     comp.clip_buffer(N, samples);
 }
 
