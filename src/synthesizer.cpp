@@ -15,9 +15,10 @@ static double poly_blep(double t, double dt);
 static double synth_tree(size_t type, double phase, double phase_inc, double pulse_cycle, double amplitude);
 
 static const std::vector<Oscillator> DEFAULT_OSCILLATOR_LIST = { 
-    Oscillator(SAW, 0.99, 0.8, 1.0),
-    Oscillator(SAW, 1.01, 0.8, 1.0),
-    Oscillator(SQUARE, 1.0, 0.4, 1.0)
+    Oscillator(SAW, 1.0, 0.8, 1.0),
+    Oscillator(SAW, 0.99, 0.4, 1.0),
+    Oscillator(SAW, 1.01, 0.4, 1.0),
+    Oscillator(SINE, 1.0, 0.7, 0.5)
 };
 
 //https://www.martin-finke.de/articles/audio-plugins-018-polyblep-oscillator/
@@ -58,27 +59,23 @@ static double synth_tree(size_t type, double phase, double phase_inc, double pul
     }
 }
 
-void Compressor::compressor(size_t N, float *buffer) {
-    const double th = 0.85;
+void Compressor::clip_buffer(size_t N, float *buffer) {
     for(size_t n = 0; n < N; n++){
-        const double aval = std::abs(buffer[n]);
-        if(aval > envelope){
-            envelope = step(aval, envelope, attack);
+        if((flags & USE_SOFT_CLIPPING) && (flags & DISTORTION_ENABLED)){
+            buffer[n] = tanh(buffer[n] * gain);
+        } else if (flags & USE_SOFT_CLIPPING) {
+            buffer[n] = tanh(buffer[n]);
         } else {
-            envelope = step(aval, envelope, release);
-        }
-
-        if(envelope > th){
-            buffer[n] *= (th / envelope);
+            continue;
         }
     }
 }
 
-constexpr double neutral = 1.0;
-constexpr double falloff = 0.001;
-
 //https://github.com/mmitch/syndig/blob/master/src/compressor.c
 void Compressor::block_compressor(size_t N, float *buffer){
+    const double neutral = 1.0;
+    const double falloff = 0.001;
+
     static bool compressing = false;
     static double compression = neutral;
     double min = 0.0;
@@ -167,7 +164,7 @@ double Lfo::get_inc(int sample_rate) {
     return rate / sample_rate;
 }
 
-Synth::Synth() : config(sample_rate, DEFAULT_OSCILLATOR_LIST), voices(voice_count, Voice(config)) {}
+Synth::Synth() : cfg(sample_rate, DEFAULT_OSCILLATOR_LIST), voices(voice_count, Voice(cfg)) {}
 
 Oscillator::Oscillator(size_t _type, double _tuning, double _amplitude, double _pulse_cycles) : type(_type), tuning(_tuning), amplitude(_amplitude), pulse_cycles(_pulse_cycles) {
     if(tuning > DETUNE_MAX) {
@@ -295,39 +292,24 @@ void Synth::voice_send_kill_signal(unsigned int midi_key) {
 }
 
 void Synth::run(size_t N, float *samples){
+    const size_t voice_count = voices.size();
     for(int n = 0; n < N; n++){
         double frame_sample = 0.0;
-        for(auto it = voices.begin(); it != voices.end(); ++it){
-            if(it->get_state() != OFF){
-                frame_sample += it->run(sample_rate);
+        for(size_t voice = 0; voice < voice_count; ++voice){
+            if(voices[voice].get_state() != OFF){
+                frame_sample += voices[voice].run(sample_rate);
             } else {
                 continue;
             }
         }
-        samples[n] = static_cast<float>(frame_sample);
+        samples[n] = static_cast<float>(frame_sample / voice_count);
     }
-    comp.compressor(N, samples);
+    comp.clip_buffer(N, samples);
 }
 
 double Voice::run_low_pass(double dt, double voice_sample){
     filter[FILTER_ONE_POLE] = low_pass_filter(dt, ONE_POLE_HZ, voice_sample, filter[FILTER_ONE_POLE]);
     return filter[FILTER_ONE_POLE];
-}
-
-double Voice::apply_drive(double sample){
-    if(cfg.get_distortion_state() & PRE_DRIVE_ENABLED){
-        return tanh(sample * cfg.get_drive());
-    } else {
-        return sample;
-    }
-}
-
-double Voice::apply_gain(double sample){
-    if(cfg.get_distortion_state() & DISTORTION_ENABLED){
-        return tanh(sample * cfg.get_gain());
-    } else {
-        return sample;
-    }
 }
 
 double Voice::run(int sample_rate) {
@@ -351,13 +333,9 @@ double Voice::run(int sample_rate) {
             voice_sample += oscs[i].run(osc, real_freq, over_sampled_rate);
         }
 
-        const double driven = apply_drive(voice_sample);
-        const double lowpass_sample = run_low_pass(dt, driven);
+        const double lowpass_sample = run_low_pass(dt, voice_sample);
         const double state_variable_out = state_variable_filter(lowpass_sample, svf_cutoff_hz, dt, cfg.get_svf_resonance());
-        const double clipped = apply_gain(state_variable_out);
-
-        accumulator += clipped;
-        // accumulator += lowpass_sample;
+        accumulator += voice_sample;
     }
     return env_mult(accumulator / over_sampling) * velocity;
 }

@@ -31,7 +31,7 @@ enum Indexes {
 
 enum Settings {
     DISTORTION_ENABLED = 0,
-    PRE_DRIVE_ENABLED,
+    USE_SOFT_CLIPPING,
 };
 
 class Voice;
@@ -44,11 +44,18 @@ class Compressor {
 public:
     Compressor(void) = default;
     void block_compressor(size_t N, float *buffer);
-    void compressor(size_t N, float *buffer);
+    void clip_buffer(size_t N, float *buffer);
+    unsigned int get_flags(void) const { return flags; }
+    double get_compressor_gain(void) const { return gain; }
+    double get_compressor_envelope(void) const { return envelope; }
+    double get_compressor_attack(void) const { return attack; }
+    double get_compressor_release(void) const { return release; }
 private:
+    unsigned int flags = DISTORTION_ENABLED | USE_SOFT_CLIPPING;
+    double gain = 8.0;
     double envelope = 0.0;
-    double attack = 0.1;
-    double release = 0.0001;
+    double attack = 0.005;
+    double release = 0.001;
 };
 
 class Lfo {
@@ -99,32 +106,26 @@ public:
     double get_decay_rate(void) const { return decay_rate; }
     double get_release_rate(void) const { return release_rate; }
 
-    double get_drive(void) const { return DRIVE; }
-    double get_gain(void) const { return GAIN; }
     double get_sustain(void) const { return SUS; }
     double get_attack(void) const { return ATK; }
     double get_decay(void) const { return DEC; }
     double get_release(void) const { return REL; }
-    unsigned int get_distortion_state(void) const { return distortion_enabled; }
     double get_svf_base_hz(void) const { return svf_filter_base_cutoff; }
     double get_svf_max_hz(void) const { return svf_filter_max_cutoff; }
     double get_svf_resonance(void) const { return svf_resonance; }
 
 private:
     std::vector<Oscillator> oscillator_list;
-    unsigned int distortion_enabled = DISTORTION_ENABLED | PRE_DRIVE_ENABLED;
     double attack_rate = 0.0;
     double decay_rate = 0.0;
     double release_rate = 0.0;
-    unsigned int ATK = 50;
-    unsigned int DEC = 150;
-    unsigned int REL = 200;
+    unsigned int ATK = 800;
+    unsigned int DEC = 900;
+    unsigned int REL = 750;
     double SUS = 0.7;
-    double DRIVE = 2.0;
-    double GAIN = 5.0;
     double svf_filter_base_cutoff = 1000.0;
     double svf_filter_max_cutoff = 4000.0;
-    double svf_resonance = 0.75;
+    double svf_resonance = 0.707;
 };
 
 // Per voice state
@@ -196,6 +197,8 @@ private:
 
 class Synth {
 public:
+    static constexpr size_t volume_max = 10.0;
+    static constexpr size_t volume_min = 0.0;
     static constexpr size_t voice_count = 16;
     static constexpr int sample_rate = 48000;
     static constexpr int channels = 1;
@@ -207,8 +210,11 @@ public:
     void run(size_t N, float *hardware_buffer);
     void voice_push_note(double freq, double velocity, unsigned int midi_key);
     void voice_send_kill_signal(unsigned int midi_key);
+    double get_volume(void) const { return volume; }
+
 private:
-    Synth_Parameters config;
+    double volume = 1.0;
+    Synth_Parameters cfg;
     std::vector<Voice> voices;
     Compressor comp;
 };
